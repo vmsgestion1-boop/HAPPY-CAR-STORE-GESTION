@@ -1,0 +1,258 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { Navigation } from '@/components/navigation';
+import { PageHeader } from '@/components/page-header';
+import { Card, Button, Input, Select, Badge } from '@/components/ui';
+import { fetchAccountBalances, fetchPayments, createPayment, fetchAccounts } from '@/lib/api';
+import { useRequireAuth } from '@/lib/hooks';
+import { Account, AccountBalance, Payment } from '@/lib/types';
+import { formatCurrency, formatDate } from '@/lib/utils';
+import clsx from 'clsx';
+
+export default function FinancePage() {
+    const { loading: authLoading } = useRequireAuth();
+    const [balances, setBalances] = useState<AccountBalance[]>([]);
+    const [payments, setPayments] = useState<Payment[]>([]);
+    const [accounts, setAccounts] = useState<Account[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [showForm, setShowForm] = useState(false);
+    const [formData, setFormData] = useState({
+        account_id: '',
+        date_paiement: '',
+        type_paiement: 'encaissement' as 'encaissement' | 'decaissement',
+        montant: 0,
+        mode_paiement: 'virement',
+        reference: '',
+        description: '',
+    });
+    const [error, setError] = useState('');
+
+    // Computed totals
+    const totalCreances = balances.filter(b => b.solde_actuel > 0 && b.type_compte === 'client').reduce((acc, curr) => acc + curr.solde_actuel, 0);
+    const totalDettes = balances.filter(b => b.solde_actuel < 0 && b.type_compte === 'fournisseur').reduce((acc, curr) => acc + Math.abs(curr.solde_actuel), 0);
+
+    useEffect(() => {
+        if (!authLoading) {
+            loadData();
+        }
+    }, [authLoading]);
+
+    async function loadData() {
+        try {
+            const [bals, pays, accs] = await Promise.all([
+                fetchAccountBalances(),
+                fetchPayments(),
+                fetchAccounts()
+            ]);
+            setBalances(bals);
+            setPayments(pays);
+            setAccounts(accs);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to load data');
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    async function handleSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        try {
+            await createPayment(formData);
+            setFormData({
+                account_id: '',
+                date_paiement: '',
+                type_paiement: 'encaissement',
+                montant: 0,
+                mode_paiement: 'virement',
+                reference: '',
+                description: '',
+            });
+            setShowForm(false);
+            await loadData();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to save payment');
+        }
+    }
+
+    if (authLoading || loading) {
+        return <div className="min-h-screen flex items-center justify-center">⏳ Chargement...</div>;
+    }
+
+    return (
+        <div>
+            <Navigation />
+
+            <main className="flex-1 container-modern py-8">
+                <PageHeader
+                    title="Gestion Financière"
+                    subtitle="Suivi de trésorerie, créances clients et dettes fournisseurs"
+                    icon="💰"
+                    action={{
+                        label: '➕ Enregistrer un Paiement',
+                        onClick: () => setShowForm(!showForm),
+                    }}
+                />
+
+                {/* KPI Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <Card variant="gradient" className="from-green-500 to-emerald-600">
+                        <h3 className="text-lg font-medium text-white/90 mb-2">Créances Clients (À recevoir)</h3>
+                        <p className="text-4xl font-bold text-white">{formatCurrency(totalCreances)}</p>
+                    </Card>
+                    <Card variant="gradient" className="from-red-500 to-rose-600">
+                        <h3 className="text-lg font-medium text-white/90 mb-2">Dettes Fournisseurs (À payer)</h3>
+                        <p className="text-4xl font-bold text-white">{formatCurrency(totalDettes)}</p>
+                    </Card>
+                </div>
+
+                {error && (
+                    <div className="mb-6 bg-red-100 border border-red-200 text-red-800 p-4 rounded-xl">
+                        ⚠️ {error}
+                    </div>
+                )}
+
+                {showForm && (
+                    <Card title="Nouveau Paiement / Règlement" className="card-modern mb-8">
+                        <form onSubmit={handleSubmit} className="space-y-5">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <Select
+                                    label="Type de Mouvement"
+                                    value={formData.type_paiement}
+                                    onChange={(e) => setFormData({ ...formData, type_paiement: e.target.value as any })}
+                                    options={[
+                                        { value: 'encaissement', label: '📥 Encaissement (Entrée d\'argent)' },
+                                        { value: 'decaissement', label: '📤 Décaissement (Sortie d\'argent)' },
+                                    ]}
+                                    required
+                                />
+                                <Select
+                                    label="Compte Tiers"
+                                    value={formData.account_id}
+                                    onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
+                                    options={accounts.map((a) => ({ value: a.id, label: `${a.code_compte} - ${a.nom_compte}` }))}
+                                    required
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <Input
+                                    label="Date"
+                                    type="date"
+                                    value={formData.date_paiement}
+                                    onChange={(e) => setFormData({ ...formData, date_paiement: e.target.value })}
+                                    required
+                                />
+                                <Input
+                                    label="Montant (€)"
+                                    type="number"
+                                    step="0.01"
+                                    value={formData.montant}
+                                    onChange={(e) => setFormData({ ...formData, montant: parseFloat(e.target.value) })}
+                                    required
+                                />
+                                <Select
+                                    label="Mode de Paiement"
+                                    value={formData.mode_paiement}
+                                    onChange={(e) => setFormData({ ...formData, mode_paiement: e.target.value })}
+                                    options={[
+                                        { value: 'virement', label: 'Virement Bancaire' },
+                                        { value: 'cheque', label: 'Chèque' },
+                                        { value: 'especes', label: 'Espèces' },
+                                        { value: 'carte', label: 'Carte Bancaire' },
+                                    ]}
+                                    required
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <Input
+                                    label="Référence (N° Chèque/Virement)"
+                                    value={formData.reference}
+                                    onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
+                                />
+                                <Input
+                                    label="Description / Libellé"
+                                    value={formData.description}
+                                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                />
+                            </div>
+
+                            <div className="flex gap-3 pt-4">
+                                <Button type="submit" variant="primary">Enregistrer</Button>
+                                <Button type="button" variant="ghost" onClick={() => setShowForm(false)}>Annuler</Button>
+                            </div>
+                        </form>
+                    </Card>
+                )}
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* Recent Payments List */}
+                    <Card title="Historique des Paiements" className="card-modern">
+                        {payments.length === 0 ? (
+                            <p className="text-gray-500 italic">Aucun paiement enregistré.</p>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr>
+                                            <th className="px-2">Date</th>
+                                            <th className="px-2">Tiers</th>
+                                            <th className="px-2">Type</th>
+                                            <th className="px-2 text-right">Montant</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {payments.slice(0, 10).map((p) => {
+                                            const acc = accounts.find(a => a.id === p.account_id);
+                                            return (
+                                                <tr key={p.id} className="hover:bg-gray-50">
+                                                    <td className="px-2 py-2">{formatDate(p.date_paiement)}</td>
+                                                    <td className="px-2 py-2 truncate max-w-[120px]">{acc?.nom_compte || '-'}</td>
+                                                    <td className="px-2 py-2">
+                                                        <Badge variant={p.type_paiement === 'encaissement' ? 'success' : 'warning'} size="sm">
+                                                            {p.type_paiement === 'encaissement' ? 'Encaissement' : 'Décaissement'}
+                                                        </Badge>
+                                                    </td>
+                                                    <td className={clsx("px-2 py-2 text-right font-bold", p.type_paiement === 'encaissement' ? 'text-green-600' : 'text-red-600')}>
+                                                        {p.type_paiement === 'encaissement' ? '+' : '-'}{formatCurrency(p.montant)}
+                                                    </td>
+                                                </tr>
+                                            )
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </Card>
+
+                    {/* Balances List */}
+                    <Card title="Soldes des Tiers" className="card-modern">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr>
+                                        <th className="px-2">Compte</th>
+                                        <th className="px-2">Type</th>
+                                        <th className="px-2 text-right">Solde</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {balances.filter(b => b.solde_actuel !== 0).slice(0, 10).map((b) => (
+                                        <tr key={b.account_id} className="hover:bg-gray-50">
+                                            <td className="px-2 py-2 font-medium">{b.nom_compte}</td>
+                                            <td className="px-2 py-2 capitalize text-gray-500">{b.type_compte}</td>
+                                            <td className={clsx("px-2 py-2 text-right font-bold", b.solde_actuel > 0 ? 'text-green-600' : 'text-red-600')}>
+                                                {formatCurrency(b.solde_actuel)}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </Card>
+                </div>
+            </main>
+        </div>
+    );
+}

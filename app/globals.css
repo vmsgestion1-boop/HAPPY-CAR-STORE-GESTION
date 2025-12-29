@@ -1,0 +1,190 @@
+/* VMS Gestion - Global Styles - Modern Design */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&family=Sora:wght@400;500;600;700&display=swap');
+
+/* Base Styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  font-family: 'Poppins', sans-serif;
+}
+
+body {
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  min-height: 100vh;
+  color: #1a202c;
+  line-height: 1.6;
+  font-weight: 400;
+}
+
+/* Typography */
+h1 {
+  @apply text-5xl font-bold text-gray-900 tracking-tight;
+}
+
+h2 {
+  @apply text-4xl font-bold text-gray-900 tracking-tight;
+}
+
+h3 {
+  @apply text-2xl font-semibold text-gray-800;
+}
+
+h4 {
+  @apply text-xl font-semibold text-gray-800;
+}
+
+p {
+  @apply text-gray-700 leading-relaxed;
+}
+
+a {
+  @apply text-primary-600 hover:text-primary-700 transition-colors duration-200;
+}
+
+/* Forms */
+input,
+select,
+textarea {
+  @apply w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none transition-all duration-200 bg-white;
+}
+
+input:disabled,
+select:disabled {
+  @apply bg-gray-100 cursor-not-allowed;
+}
+
+/* Containers */
+.container-modern {
+  @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+}
+
+.container-main {
+  @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+}
+
+/* Glass morphism effect */
+.glass {
+  @apply bg-white/40 backdrop-blur-lg border border-white/20 rounded-2xl;
+}
+
+/* Gradient text */
+.gradient-text {
+  @apply bg-gradient-to-r from-primary-600 to-accent-600 bg-clip-text text-transparent;
+}
+
+/* Modern card */
+.card-modern {
+  @apply bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100/50;
+}
+
+/* Card shadow */
+.card-shadow {
+  @apply shadow-md hover:shadow-xl transition-all duration-300;
+}
+
+/* Smooth transitions */
+.transition-smooth {
+  @apply transition-all duration-300 ease-out;
+}
+
+/* Page Header */
+.page-header {
+  @apply mb-8;
+}
+
+.page-title {
+  @apply text-5xl font-bold gradient-text mb-3;
+}
+
+.page-subtitle {
+  @apply text-lg text-gray-600;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Tables */
+table {
+  @apply w-full border-collapse;
+}
+
+th {
+  @apply bg-gradient-to-r from-primary-50 to-secondary-50 px-4 py-3 text-left font-semibold text-gray-900 border-b-2 border-primary-200;
+}
+
+td {
+  @apply px-4 py-3 border-b border-gray-200;
+}
+
+tr:hover {
+  @apply bg-gray-50 transition-colors;
+}
+
+/* Buttons */
+button {
+  @apply cursor-pointer transition-all duration-200;
+}
+
+/* Cards */
+.card {
+  @apply bg-white rounded-2xl shadow-md p-6;
+}
+
+/* Utilities */
+.truncate-lines-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Loading states */
+.loading-spinner {
+  @apply animate-spin;
+}
+
+.skeleton {
+  @apply bg-gray-200 rounded-xl animate-pulse;
+}
+
+/* Print Styles */
+@media print {
+  body {
+    background: white;
+  }
+
+  .no-print {
+    display: none;
+  }
+
+  table {
+    page-break-inside: avoid;
+  }
+}

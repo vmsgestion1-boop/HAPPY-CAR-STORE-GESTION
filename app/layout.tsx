@@ -1,0 +1,23 @@
+import '@/app/globals.css';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'VMS Gestion - Application Moderne',
+  description: 'Plateforme de gestion intelligente et intuitive',
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="fr">
+      <body className="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 min-h-screen text-gray-900">
+        <div className="min-h-screen flex flex-col">
+          {children}
+        </div>
+      </body>
+    </html>
+  );
+}

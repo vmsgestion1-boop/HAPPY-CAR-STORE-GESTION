@@ -1,0 +1,33 @@
+node_modules/
+.next/
+out/
+dist/
+build/
+
+*.log
+*.pem
+.DS_Store
+.env
+.env.local
+.env.*.local
+
+.vercel
+.turbo
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+Thumbs.db
+
+# Testing
+.coverage/
+.nyc_output/
+
+# Build artifacts
+.cache/
+.turbo/
