@@ -26,11 +26,40 @@ export default function FinancePage() {
         reference: '',
         description: '',
     });
+
+    // Filters
+    const [filters, setFilters] = useState({
+        search: '',
+        dateFrom: '',
+        dateTo: '',
+        type: 'all' // all, encaissement, decaissement
+    });
+    const [filteredPayments, setFilteredPayments] = useState<Payment[]>([]);
     const [error, setError] = useState('');
 
     // Computed totals
     const totalCreances = balances.filter(b => b.solde_actuel > 0 && b.type_compte === 'client').reduce((acc, curr) => acc + curr.solde_actuel, 0);
     const totalDettes = balances.filter(b => b.solde_actuel < 0 && b.type_compte === 'fournisseur').reduce((acc, curr) => acc + Math.abs(curr.solde_actuel), 0);
+
+    // Filter Effect
+    useEffect(() => {
+        let res = payments;
+
+        if (filters.dateFrom) res = res.filter(p => p.date_paiement >= filters.dateFrom);
+        if (filters.dateTo) res = res.filter(p => p.date_paiement <= filters.dateTo);
+        if (filters.type !== 'all') res = res.filter(p => p.type_paiement === filters.type);
+        if (filters.search) {
+            const lower = filters.search.toLowerCase();
+            const accIds = accounts.filter(a => a.nom_compte.toLowerCase().includes(lower)).map(a => a.id);
+            res = res.filter(p =>
+                accIds.includes(p.account_id) ||
+                (p.description && p.description.toLowerCase().includes(lower)) ||
+                (p.reference && p.reference.toLowerCase().includes(lower))
+            );
+        }
+
+        setFilteredPayments(res);
+    }, [filters, payments, accounts]);
 
     useEffect(() => {
         if (!authLoading) {
@@ -47,6 +76,7 @@ export default function FinancePage() {
             ]);
             setBalances(bals);
             setPayments(pays);
+            setFilteredPayments(pays);
             setAccounts(accs);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to load data');
@@ -144,7 +174,7 @@ export default function FinancePage() {
                                     required
                                 />
                                 <Input
-                                    label="Montant (€)"
+                                    label="Montant (DA)"
                                     type="number"
                                     step="0.01"
                                     value={formData.montant}
@@ -189,7 +219,25 @@ export default function FinancePage() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     {/* Recent Payments List */}
                     <Card title="Historique des Paiements" className="card-modern">
-                        {payments.length === 0 ? (
+                        {/* Filters Toolbar */}
+                        <div className="flex flex-wrap gap-2 mb-4 bg-gray-50 p-2 rounded-lg border border-gray-200">
+                            <Input type="date" className="w-auto h-9" value={filters.dateFrom} onChange={e => setFilters({ ...filters, dateFrom: e.target.value })} />
+                            <Input type="date" className="w-auto h-9" value={filters.dateTo} onChange={e => setFilters({ ...filters, dateTo: e.target.value })} />
+                            <Select
+                                value={filters.type}
+                                onChange={e => setFilters({ ...filters, type: e.target.value })}
+                                options={[{ value: 'all', label: 'Tout' }, { value: 'encaissement', label: 'Encaissement' }, { value: 'decaissement', label: 'Décaissement' }]}
+                                className="w-auto h-9"
+                            />
+                            <Input
+                                placeholder="Recherche..."
+                                className="w-40 h-9"
+                                value={filters.search}
+                                onChange={e => setFilters({ ...filters, search: e.target.value })}
+                            />
+                        </div>
+
+                        {filteredPayments.length === 0 ? (
                             <p className="text-gray-500 italic">Aucun paiement enregistré.</p>
                         ) : (
                             <div className="overflow-x-auto">
@@ -203,7 +251,7 @@ export default function FinancePage() {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {payments.slice(0, 10).map((p) => {
+                                        {filteredPayments.slice(0, 50).map((p) => {
                                             const acc = accounts.find(a => a.id === p.account_id);
                                             return (
                                                 <tr key={p.id} className="hover:bg-gray-50">

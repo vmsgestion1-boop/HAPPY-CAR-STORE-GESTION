@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { Account, AccountBalance, DashboardSummary, AccountStatement, VehicleDefinition } from './types';
+import { Account, AccountBalance, DashboardSummary, AccountStatement, VehicleDefinition, CompanySettings } from './types';
 
 // ============================================================================
 // ACCOUNTS
@@ -140,6 +140,18 @@ export async function createOperation(operation: any) {
   const { data, error } = await supabase
     .from('receptions_livraisons')
     .insert([operation])
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function updateOperation(id: string, operation: any) {
+  const { data, error } = await supabase
+    .from('receptions_livraisons')
+    .update(operation)
+    .eq('id', id)
     .select()
     .single();
 
@@ -290,4 +302,33 @@ export async function deleteVehicleDefinition(id: string): Promise<void> {
     .eq('id', id);
 
   if (error) throw error;
+}
+
+// ============================================================================
+// COMPANY SETTINGS
+// ============================================================================
+
+export async function fetchCompanySettings(): Promise<CompanySettings> {
+  const { data, error } = await supabase
+    .from('company_settings')
+    .select('*')
+    .limit(1)
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function updateCompanySettings(settings: Partial<CompanySettings>): Promise<CompanySettings> {
+  if (!settings.id) throw new Error("Settings ID required for update");
+
+  const { data, error } = await supabase
+    .from('company_settings')
+    .update(settings)
+    .eq('id', settings.id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
 }

@@ -7,6 +7,12 @@ export interface Account {
   type_compte: 'client' | 'fournisseur' | 'interne';
   solde_initial: number;
   actif: boolean;
+  address?: string;
+  n_carte_identite?: string;
+  nif?: string;
+  nis?: string;
+  rc?: string;
+  ai?: string;
   created_at: string;
   updated_at: string;
 }
@@ -25,6 +31,7 @@ export interface Reception {
   numero_chassis?: string;
   prix_achat?: number;
   prix_vente?: number;
+  prix_unitaire?: number;
   commission?: number;
 }
 
@@ -93,15 +100,20 @@ export interface User {
   created_at: string;
 }
 
-export interface AuditLog {
+export interface CompanySettings {
   id: string;
-  table_name: string;
-  operation: 'INSERT' | 'UPDATE' | 'DELETE';
-  record_id: string;
-  old_values: Record<string, any> | null;
-  new_values: Record<string, any> | null;
-  changed_by: string | null;
-  changed_at: string;
+  name: string;
+  address: string;
+  city: string;
+  country: string;
+  phone: string;
+  email: string;
+  website?: string;
+  capital: string;
+  rc: string;
+  nif: string;
+  nis: string;
+  ai: string;
 }
 
 export interface Payment {

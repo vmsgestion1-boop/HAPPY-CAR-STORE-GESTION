@@ -14,6 +14,8 @@ export default function StockPage() {
     const { loading: authLoading } = useRequireAuth();
     const [loading, setLoading] = useState(true);
     const [stock, setStock] = useState<Operation[]>([]);
+    const [filteredStock, setFilteredStock] = useState<Operation[]>([]); // New state
+    const [search, setSearch] = useState(''); // Search state
     const [stats, setStats] = useState({ count: 0, totalValue: 0 });
 
     useEffect(() => {
@@ -40,6 +42,7 @@ export default function StockPage() {
             );
 
             setStock(currentStock);
+            setFilteredStock(currentStock); // Init filtered
 
             // Calculate Stats
             const totalVal = currentStock.reduce((sum, item) => sum + (Number(item.montant) || 0), 0);
@@ -54,6 +57,21 @@ export default function StockPage() {
             setLoading(false);
         }
     }
+
+    // Filter Effect
+    useEffect(() => {
+        if (!search) {
+            setFilteredStock(stock);
+            return;
+        }
+        const lower = search.toLowerCase();
+        const res = stock.filter(item =>
+            item.marque?.toLowerCase().includes(lower) ||
+            item.modele?.toLowerCase().includes(lower) ||
+            item.numero_chassis?.toLowerCase().includes(lower)
+        );
+        setFilteredStock(res);
+    }, [search, stock]);
 
     if (authLoading || loading) return <div className="min-h-screen flex items-center justify-center">⏳ Chargement...</div>;
 
@@ -92,6 +110,33 @@ export default function StockPage() {
 
                 {/* Stock Table */}
                 <Card title="Détail du Parc" subtitle="Liste des numéros de châssis disponibles">
+                    {/* Toolbar */}
+                    <div className="mb-4 flex justify-between items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
+                        <div className="flex items-center gap-2 w-full max-w-sm">
+                            <span className="text-xl">🔍</span>
+                            <div className="relative w-full">
+                                <input
+                                    type="text"
+                                    placeholder="Rechercher marque, modèle, VIN..."
+                                    className="w-full pl-3 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                />
+                                {search && (
+                                    <button
+                                        onClick={() => setSearch('')}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                    >
+                                        ✕
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                        <div className="text-sm text-gray-500 font-medium">
+                            {filteredStock.length} véhicule(s) affiché(s)
+                        </div>
+                    </div>
+
                     <div className="overflow-x-auto">
                         <table className="w-full">
                             <thead className="bg-gray-50 border-b border-gray-100">
@@ -111,7 +156,7 @@ export default function StockPage() {
                                         <td colSpan={7} className="text-center py-8 text-gray-500">Aucun véhicule en stock</td>
                                     </tr>
                                 ) : (
-                                    stock.map((item) => (
+                                    filteredStock.map((item) => (
                                         <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
                                             <td className="py-4 px-4">
                                                 <div className="font-bold text-gray-900">{item.marque}</div>

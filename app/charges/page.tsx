@@ -12,8 +12,12 @@ import { formatDate, formatCurrency } from '@/lib/utils';
 export default function ChargesPage() {
   const { loading: authLoading } = useRequireAuth();
   const [charges, setCharges] = useState<Charge[]>([]);
+  const [filteredCharges, setFilteredCharges] = useState<Charge[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     account_id: '',
@@ -29,10 +33,37 @@ export default function ChargesPage() {
     }
   }, [authLoading]);
 
+  useEffect(() => {
+    let currentCharges = [...charges];
+
+    // Filter by search term
+    if (search) {
+      const lowercasedSearch = search.toLowerCase();
+      currentCharges = currentCharges.filter(charge => {
+        const account = accounts.find(a => a.id === charge.account_id);
+        return (
+          charge.description.toLowerCase().includes(lowercasedSearch) ||
+          (account && account.nom_compte.toLowerCase().includes(lowercasedSearch))
+        );
+      });
+    }
+
+    // Filter by date range
+    if (dateFrom) {
+      currentCharges = currentCharges.filter(charge => charge.date_charge >= dateFrom);
+    }
+    if (dateTo) {
+      currentCharges = currentCharges.filter(charge => charge.date_charge <= dateTo);
+    }
+
+    setFilteredCharges(currentCharges);
+  }, [charges, search, dateFrom, dateTo, accounts]);
+
   async function loadData() {
     try {
       const [chgs, accs] = await Promise.all([fetchCharges(), fetchAccounts()]);
       setCharges(chgs);
+      setFilteredCharges(chgs);
       setAccounts(accs);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load data');
@@ -111,7 +142,7 @@ export default function ChargesPage() {
                   required
                 />
                 <Input
-                  label="Montant (€)"
+                  label="Montant (DA)"
                   type="number"
                   step="0.01"
                   value={formData.montant}
@@ -139,37 +170,74 @@ export default function ChargesPage() {
         )}
 
         <Card className="card-modern">
-          {charges.length === 0 ? (
+          {/* Filters */}
+          <div className="flex flex-col md:flex-row gap-4 mb-6 p-4 bg-gray-50 rounded-lg border border-gray-100">
+            <Input
+              placeholder="Rechercher par description ou compte..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="flex-1"
+            />
+            <Input
+              label="Du"
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="w-full md:w-auto"
+            />
+            <Input
+              label="Au"
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="w-full md:w-auto"
+            />
+          </div>
+
+          {/* Table Content */}
+          {filteredCharges.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-gray-500 text-lg mb-4">💰 Aucune charge enregistrée</p>
-              <Button variant="secondary" onClick={() => setShowForm(true)}>
-                ➕ Créer une charge
-              </Button>
+              <p className="text-gray-500 text-lg mb-4">💰 Aucune charge trouvée pour les critères actuels.</p>
+              {charges.length === 0 && (
+                <Button variant="secondary" onClick={() => setShowForm(true)}>
+                  ➕ Créer une charge
+                </Button>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
                   <tr>
-                    <th>Date</th>
-                    <th>Compte</th>
-                    <th>Description</th>
-                    <th className="text-right">Montant</th>
-                    <th className="text-center">Actions</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Date
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Compte
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Description
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Montant
+                    </th>
+                    <th scope="col" className="relative px-6 py-3">
+                      <span className="sr-only">Actions</span>
+                    </th>
                   </tr>
                 </thead>
-                <tbody>
-                  {charges.map((charge) => {
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredCharges.map((charge) => {
                     const account = accounts.find((a) => a.id === charge.account_id);
                     return (
                       <tr key={charge.id}>
-                        <td className="font-medium">{formatDate(charge.date_charge)}</td>
-                        <td>{account?.nom_compte}</td>
-                        <td className="text-gray-600">{charge.description}</td>
-                        <td className="text-right font-semibold text-red-600">
+                        <td className="px-6 py-4 whitespace-nowrap font-medium">{formatDate(charge.date_charge)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">{account?.nom_compte}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-gray-600">{charge.description}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right font-semibold text-red-600">
                           -{formatCurrency(charge.montant)}
                         </td>
-                        <td className="text-center">
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
                           <Button
                             size="sm"
                             variant="danger"
@@ -190,10 +258,12 @@ export default function ChargesPage() {
             </div>
           )}
 
+          {/* Footer Stats */}
           {charges.length > 0 && (
             <div className="mt-6 pt-6 border-t border-gray-100">
               <p className="text-sm text-gray-600">
-                Total: <span className="font-semibold text-gray-900">{charges.length} charge(s)</span>
+                Total: <span className="font-semibold text-gray-900">{filteredCharges.length} charge(s)</span>
+                {filteredCharges.length !== charges.length && ` (sur ${charges.length} total)`}
               </p>
             </div>
           )}

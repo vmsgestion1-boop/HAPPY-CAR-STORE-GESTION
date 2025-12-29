@@ -6,8 +6,11 @@ import { PageHeader } from '@/components/page-header';
 import { Card, Button, Input, Select, Badge } from '@/components/ui';
 import { fetchOperations, fetchPayments, fetchAccounts, fetchVehicleDefinitions } from '@/lib/api';
 import { useRequireAuth } from '@/lib/hooks';
-import { formatCurrency, formatDate } from '@/lib/utils';
-import { Account, Reception, Payment } from '@/lib/types';
+import { formatCurrency, formatCurrencySafe, formatDate } from '@/lib/utils';
+import { Account, Reception, Payment, CompanySettings } from '@/lib/types'; // Import CompanySettings
+import { fetchCompanySettings } from '@/lib/api'; // Import API
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // Unified type for display
 interface JournalEntry {
@@ -169,6 +172,87 @@ export default function JournalPage() {
             .reduce((sum, e) => sum + e.montant, 0),
     };
 
+    async function generateJournalPDF() {
+        try {
+            const doc = new jsPDF();
+
+            const defaultCompany = {
+                name: 'VMS AUTOMOBILES',
+                address: 'Zone Industrielle',
+                city: 'Alger',
+                country: 'Algérie',
+                phone: '+213 555 00 00 00',
+                email: 'contact@vms.dz',
+                capital: '10 000 000 DA',
+                rc: '16/00-0000000', nif: '0000000000', nis: '0000000000', ai: '0000000000'
+            };
+            let company: CompanySettings | typeof defaultCompany = defaultCompany;
+
+            // Try fetch dynamic settings
+            try {
+                const settings = await fetchCompanySettings();
+                if (settings) {
+                    company = settings;
+                }
+            } catch (e) {
+                console.warn("Using fallback constants for PDF");
+            }
+
+            // Header
+            doc.setFontSize(10);
+            doc.setTextColor(100);
+            doc.text(company.name, 14, 15);
+            doc.text(`${company.address}, ${company.city}`, 14, 20);
+            doc.text(`Tél: ${company.phone} | RC: ${company.rc}`, 14, 25);
+            doc.text(`NIF: ${company.nif} | NIS: ${company.nis} | AI: ${company.ai}`, 14, 30);
+
+            doc.setFontSize(16);
+            doc.setTextColor(0);
+            doc.text(`Journal des Opérations`, 14, 35);
+
+            doc.setFontSize(10);
+            doc.text(`Généré le: ${formatDate(new Date())}`, 14, 42);
+            if (filters.dateFrom || filters.dateTo) {
+                doc.text(`Période: ${filters.dateFrom || '...'} au ${filters.dateTo || '...'}`, 14, 47);
+            }
+
+            // Table
+            const tableData = filteredEntries.map(e => [
+                formatDate(e.date),
+                e.displayType,
+                e.accountName,
+                e.description.substring(0, 30), // Truncate
+                (e.originalType === 'reception' || e.originalType === 'decaissement' ? '-' : '+') + formatCurrencySafe(e.montant)
+            ]);
+
+            autoTable(doc, {
+                startY: 55,
+                head: [['Date', 'Type', 'Tiers', 'Description', 'Montant']],
+                body: tableData,
+                theme: 'grid',
+                headStyles: { fillColor: [63, 81, 181] } as any,
+                columnStyles: {
+                    0: { cellWidth: 25 },
+                    1: { cellWidth: 30 },
+                    2: { cellWidth: 40 },
+                    3: { cellWidth: 'auto' },
+                    4: { cellWidth: 35, halign: 'right', fontStyle: 'bold' }
+                } as any
+            });
+
+            // Summary Footer
+            // @ts-ignore
+            const finalY = (doc as any).lastAutoTable?.finalY + 10 || 60;
+            doc.text(`Total Entrees (Vente/Encaissement): ${formatCurrencySafe(totals.sales + totals.encaissements)}`, 14, finalY);
+            doc.text(`Total Sorties (Achat/Decaissement): ${formatCurrencySafe(totals.receptions + totals.decaissements)}`, 14, finalY + 5);
+
+            doc.save(`journal_global_${new Date().toISOString().slice(0, 10)}.pdf`);
+        } catch (err) {
+            console.error(err);
+            alert("Erreur lors de la génération du PDF");
+        }
+    }
+
     if (authLoading || loading) return <div className="min-h-screen flex items-center justify-center">⏳ Chargement...</div>;
 
     return (
@@ -177,8 +261,12 @@ export default function JournalPage() {
             <main className="flex-1 container-modern py-8">
                 <PageHeader
                     title="Journal Global"
-                    subtitle="Vue d'ensemble chronologique de toutes les opérations et paiements"
+                    subtitle="Vue d'overview chronologique de toutes les opérations et paiements"
                     icon="📑"
+                    action={{
+                        label: '🖨️ Imprimer PDF',
+                        onClick: generateJournalPDF
+                    }}
                 />
 
                 {/* Filters */}

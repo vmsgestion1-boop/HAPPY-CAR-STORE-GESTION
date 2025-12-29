@@ -11,6 +11,8 @@ import { Account } from '@/lib/types';
 export default function AccountsPage() {
   const { loading: authLoading } = useRequireAuth();
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [filteredAccounts, setFilteredAccounts] = useState<Account[]>([]);
+  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -19,11 +21,23 @@ export default function AccountsPage() {
     nom_compte: string;
     type_compte: 'client' | 'fournisseur' | 'interne';
     solde_initial: number;
+    address?: string;
+    n_carte_identite?: string;
+    nif?: string;
+    nis?: string;
+    rc?: string;
+    ai?: string;
   }>({
     code_compte: '',
     nom_compte: '',
     type_compte: 'client',
     solde_initial: 0,
+    address: '',
+    n_carte_identite: '',
+    nif: '',
+    nis: '',
+    rc: '',
+    ai: ''
   });
   const [error, setError] = useState('');
 
@@ -37,12 +51,28 @@ export default function AccountsPage() {
     try {
       const data = await fetchAccounts();
       setAccounts(data);
+      setFilteredAccounts(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load accounts');
     } finally {
       setLoading(false);
     }
   }
+
+
+  useEffect(() => {
+    if (!search) {
+      setFilteredAccounts(accounts);
+      return;
+    }
+    const lower = search.toLowerCase();
+    setFilteredAccounts(accounts.filter(a =>
+      a.nom_compte.toLowerCase().includes(lower) ||
+      a.code_compte.toLowerCase().includes(lower) ||
+      // Check legal fields too if you want
+      a.nif?.includes(search)
+    ));
+  }, [search, accounts]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -53,11 +83,11 @@ export default function AccountsPage() {
 
     try {
       if (editingId) {
-        await updateAccount(editingId, formData);
+        await updateAccount(editingId, formData as Account);
       } else {
-        await createAccount(formData as any);
+        await createAccount({ ...formData, actif: true } as any);
       }
-      setFormData({ code_compte: '', nom_compte: '', type_compte: 'client', solde_initial: 0 });
+      setFormData({ code_compte: '', nom_compte: '', type_compte: 'client', solde_initial: 0, address: '', n_carte_identite: '', nif: '', nis: '', rc: '', ai: '' });
       setEditingId(null);
       setShowForm(false);
       await loadAccounts();
@@ -107,7 +137,7 @@ export default function AccountsPage() {
             label: '➕ Nouveau Compte',
             onClick: () => {
               setEditingId(null);
-              setFormData({ code_compte: '', nom_compte: '', type_compte: 'client', solde_initial: 0 });
+              setFormData({ code_compte: '', nom_compte: '', type_compte: 'client', solde_initial: 0, address: '', n_carte_identite: '', nif: '', nis: '', rc: '', ai: '' });
               setShowForm(!showForm);
             },
           }}
@@ -155,13 +185,40 @@ export default function AccountsPage() {
                   ]}
                 />
                 <Input
-                  label="Solde Initial (€)"
+                  label="Solde Initial (DA)"
                   type="number"
                   step="0.01"
                   value={formData.solde_initial}
                   onChange={(e) => setFormData({ ...formData, solde_initial: parseFloat(e.target.value) })}
                   placeholder="0.00"
                 />
+              </div>
+
+              {/* Personal Details */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Input
+                  label="Adresse Complète"
+                  value={formData.address || ''}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  placeholder="ex: 123 Rue de la Liberté"
+                />
+                <Input
+                  label="N° Carte Nationale"
+                  value={formData.n_carte_identite || ''}
+                  onChange={(e) => setFormData({ ...formData, n_carte_identite: e.target.value })}
+                  placeholder="ex: 123456789"
+                />
+              </div>
+
+              {/* Algerian Legal Fields */}
+              <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Informations Légales (Algérie)</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input label="NIF" placeholder="Numéro d'Idendification Fiscale" value={formData.nif || ''} onChange={e => setFormData({ ...formData, nif: e.target.value })} />
+                  <Input label="NIS" placeholder="Numéro d'Identification Statistique" value={formData.nis || ''} onChange={e => setFormData({ ...formData, nis: e.target.value })} />
+                  <Input label="RC" placeholder="Registre de Commerce" value={formData.rc || ''} onChange={e => setFormData({ ...formData, rc: e.target.value })} />
+                  <Input label="AI" placeholder="Article d'Imposition" value={formData.ai || ''} onChange={e => setFormData({ ...formData, ai: e.target.value })} />
+                </div>
               </div>
 
               <div className="flex gap-3 pt-4">
@@ -175,7 +232,7 @@ export default function AccountsPage() {
                   disabled={isSubmitting}
                   onClick={() => {
                     setShowForm(false);
-                    setFormData({ code_compte: '', nom_compte: '', type_compte: 'client', solde_initial: 0 });
+                    setFormData({ code_compte: '', nom_compte: '', type_compte: 'client', solde_initial: 0, address: '', n_carte_identite: '', nif: '', nis: '', rc: '', ai: '' });
                     setEditingId(null);
                   }}
                 >
@@ -188,6 +245,16 @@ export default function AccountsPage() {
 
         {/* Accounts Table */}
         <Card className="card-modern">
+          {/* Toolbar */}
+          <div className="mb-4 bg-gray-50 p-2 rounded-lg border border-gray-200">
+            <Input
+              placeholder="Rechercher un compte (Nom, Code, NIF)..."
+              className="w-full max-w-md"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
@@ -200,14 +267,14 @@ export default function AccountsPage() {
                 </tr>
               </thead>
               <tbody>
-                {accounts.length === 0 ? (
+                {filteredAccounts.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="text-center py-8 text-gray-500">
-                      Aucun compte trouvé. Créez un nouveau compte pour commencer.
+                      Aucun compte trouvé.
                     </td>
                   </tr>
                 ) : (
-                  accounts.map((account) => (
+                  filteredAccounts.map((account) => (
                     <tr key={account.id}>
                       <td className="font-semibold text-primary-600">{account.code_compte}</td>
                       <td className="font-medium">{account.nom_compte}</td>
@@ -229,7 +296,7 @@ export default function AccountsPage() {
                               : '🏦 Interne'}
                         </Badge>
                       </td>
-                      <td className="text-right font-semibold">{account.solde_initial.toFixed(2)} €</td>
+                      <td className="text-right font-semibold">{account.solde_initial.toFixed(2)} DA</td>
                       <td className="text-center">
                         <div className="flex gap-2 justify-center">
                           <Button
@@ -241,6 +308,8 @@ export default function AccountsPage() {
                                 nom_compte: account.nom_compte,
                                 type_compte: account.type_compte,
                                 solde_initial: account.solde_initial,
+                                address: (account as any).address || '',
+                                n_carte_identite: (account as any).n_carte_identite || ''
                               });
                               setEditingId(account.id);
                               setShowForm(true);
@@ -264,9 +333,9 @@ export default function AccountsPage() {
             </table>
           </div>
 
-          {accounts.length > 0 && (
+          {filteredAccounts.length > 0 && (
             <div className="mt-6 pt-6 border-t border-gray-100 text-sm text-gray-600">
-              <p>Total: <span className="font-semibold text-gray-900">{accounts.length} compte(s)</span></p>
+              <p>Total: <span className="font-semibold text-gray-900">{filteredAccounts.length} compte(s)</span></p>
             </div>
           )}
         </Card>

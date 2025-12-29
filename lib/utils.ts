@@ -9,6 +9,16 @@ export function formatCurrency(value: number): string {
   }).format(value).replace('DZD', 'DA');
 }
 
+/**
+ * Safe version of formatCurrency for PDF generation (ASCII only)
+ * to avoid garbled characters due to non-breaking spaces.
+ */
+export function formatCurrencySafe(value: number): string {
+  const parts = (value || 0).toFixed(2).split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  return parts.join('.') + ' DA';
+}
+
 export function formatDate(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date;
   return format(d, 'dd MMM yyyy', { locale: fr });

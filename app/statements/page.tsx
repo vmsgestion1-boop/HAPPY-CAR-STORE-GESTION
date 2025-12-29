@@ -4,11 +4,12 @@ import { useEffect, useState } from 'react';
 import { Navigation } from '@/components/navigation';
 import { PageHeader } from '@/components/page-header';
 import { Card, Button, Input, Select } from '@/components/ui';
-import { fetchAccountStatement, fetchAccounts } from '@/lib/api';
+import { fetchAccountStatement, fetchAccounts, fetchCompanySettings } from '@/lib/api';
 import { useRequireAuth } from '@/lib/hooks';
-import { Account, AccountStatement } from '@/lib/types';
-import { formatDate, formatCurrency, downloadFile } from '@/lib/utils';
+import { Account, AccountStatement, CompanySettings } from '@/lib/types';
+import { formatDate, formatCurrency, formatCurrencySafe, downloadFile } from '@/lib/utils';
 import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 
 export default function StatementsPage() {
@@ -20,6 +21,7 @@ export default function StatementsPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [error, setError] = useState('');
+  const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
 
   useEffect(() => {
     if (!authLoading) {
@@ -29,8 +31,12 @@ export default function StatementsPage() {
 
   async function loadAccounts() {
     try {
-      const accs = await fetchAccounts();
+      const [accs, settings] = await Promise.all([
+        fetchAccounts(),
+        fetchCompanySettings()
+      ]);
       setAccounts(accs);
+      setCompanySettings(settings);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load accounts');
     } finally {
@@ -62,35 +68,64 @@ export default function StatementsPage() {
     const account = accounts.find((a) => a.id === selectedAccount);
     const doc = new jsPDF();
 
+    // Company Header
+    const company = companySettings || {
+      name: 'VMS AUTOMOBILES',
+      address: 'Zone Industrielle',
+      city: 'Alger',
+      country: 'Algérie',
+      phone: '+213 555 00 00 00',
+      email: 'contact@vms.dz',
+      capital: '10 000 000 DA',
+      rc: '16/00-0000000',
+      nif: '0000000000',
+      nis: '0000000000',
+      ai: '0000000000'
+    };
+
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(company.name, 20, 15);
+    doc.text(`${company.address}, ${company.city}, ${company.country}`, 20, 20);
+    doc.text(`Tél: ${company.phone || '-'} | Email: ${company.email || '-'}`, 20, 25);
+    doc.text(`RC: ${company.rc || '-'} | NIF: ${company.nif || '-'}`, 20, 30);
+    doc.text(`NIS: ${company.nis || '-'} | AI: ${company.ai || '-'}`, 20, 35);
+
     // Title
     doc.setFontSize(16);
-    doc.text(`Relevé de Compte: ${account?.nom_compte}`, 20, 20);
+    doc.setTextColor(0);
+    doc.text(`Releve de Compte`, 20, 40);
 
-    // Metadata
+    // Client Info
+    doc.setFontSize(12);
+    doc.text(`${account?.nom_compte}`, 20, 50);
     doc.setFontSize(10);
-    doc.text(`Compte: ${account?.code_compte}`, 20, 30);
-    doc.text(`Généré le: ${formatDate(new Date())}`, 20, 40);
+    doc.setTextColor(100);
+    doc.text(`Compte: ${account?.code_compte}`, 20, 55);
+
+    if (account?.nif) doc.text(`NIF: ${account.nif} | RC: ${account.rc || '-'}`, 20, 60);
+
+    doc.text(`Genere le: ${formatDate(new Date())}`, 140, 15);
 
     // Table
-    let yPos = 50;
-    const headers = ['Date', 'Type', 'Montant', 'Solde'];
-    const data = statements.map((s) => [
+    const tableData = statements.map((s) => [
       formatDate(s.date_operation),
       s.type_operation,
-      formatCurrency(s.montant),
-      formatCurrency(s.solde_cumule),
+      formatCurrencySafe(s.montant),
+      formatCurrencySafe(s.solde_cumule),
     ]);
 
-    // Simple table rendering
-    doc.setFontSize(9);
-    headers.forEach((header, i) => {
-      doc.text(header, 20 + i * 50, yPos);
-    });
-
-    data.forEach((row, i) => {
-      row.forEach((cell, j) => {
-        doc.text(String(cell), 20 + j * 50, yPos + 10 + i * 10);
-      });
+    autoTable(doc, {
+      startY: 70,
+      head: [['Date', 'Type Operation', 'Montant', 'Solde Cumule']],
+      body: tableData,
+      theme: 'grid',
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [41, 128, 185] } as any,
+      columnStyles: {
+        2: { halign: 'right' },
+        3: { halign: 'right', fontStyle: 'bold' }
+      } as any
     });
 
     doc.save(`releve_${account?.code_compte}_${new Date().toISOString().split('T')[0]}.pdf`);
@@ -191,9 +226,9 @@ export default function StatementsPage() {
                       <td className="font-medium">{formatDate(stmt.date_operation)}</td>
                       <td className="capitalize">
                         <span className={`px-2 py-1 rounded text-sm ${stmt.type_operation === 'reception' ? 'bg-amber-100 text-amber-800' :
-                            stmt.type_operation === 'livraison' ? 'bg-green-100 text-green-800' :
-                              stmt.type_operation === 'charge' ? 'bg-red-100 text-red-800' :
-                                'bg-gray-100 text-gray-800'
+                          stmt.type_operation === 'livraison' ? 'bg-green-100 text-green-800' :
+                            stmt.type_operation === 'charge' ? 'bg-red-100 text-red-800' :
+                              'bg-gray-100 text-gray-800'
                           }`}>
                           {stmt.type_operation}
                         </span>

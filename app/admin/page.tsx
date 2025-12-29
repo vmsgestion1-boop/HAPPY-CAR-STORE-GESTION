@@ -1,14 +1,55 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useRequireAuth } from '@/lib/hooks';
 import { Navigation } from '@/components/navigation';
 import { PageHeader } from '@/components/page-header';
-import { Card, Button } from '@/components/ui';
+import { Card, Button, Input } from '@/components/ui';
+import { fetchCompanySettings, updateCompanySettings } from '@/lib/api';
+import { CompanySettings } from '@/lib/types';
 
 export default function AdminPage() {
   const { loading: authLoading } = useRequireAuth();
+  const [settings, setSettings] = useState<CompanySettings | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState('');
 
-  if (authLoading) {
+  useEffect(() => {
+    if (!authLoading) {
+      loadSettings();
+    }
+  }, [authLoading]);
+
+  async function loadSettings() {
+    try {
+      const data = await fetchCompanySettings();
+      setSettings(data);
+    } catch (err) {
+      console.error('Failed to load settings', err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    if (!settings) return;
+    setIsSubmitting(true);
+    setMessage('');
+
+    try {
+      await updateCompanySettings(settings);
+      setMessage('✅ Paramètres mis à jour avec succès');
+    } catch (err) {
+      console.error(err);
+      setMessage('❌ Erreur lors de la mise à jour');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  if (authLoading || loading) {
     return <div className="min-h-screen flex items-center justify-center">⏳ Chargement...</div>;
   }
 
@@ -19,56 +60,107 @@ export default function AdminPage() {
       <main className="flex-1 container-modern py-8">
         <PageHeader
           title="Administration"
-          subtitle="Outils de gestion et maintenance"
+          subtitle="Configuration de la société et maintenance"
           icon="⚙️"
         />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card title="Gestion des Utilisateurs" subtitle="Via Supabase" className="card-modern h-full">
-            <div className="space-y-4">
-              <p className="text-gray-600">
-                La gestion des utilisateurs (création, droits d'accès, mots de passe) se fait directement via le tableau de bord Supabase.
-              </p>
-              <div className="pt-2">
-                <Button variant="primary" onClick={() => window.open('https://supabase.com/dashboard', '_blank')}>
-                  Accéder à Supabase Dashboard →
-                </Button>
+        <div className="grid grid-cols-1 gap-6">
+          {/* Company Settings Form */}
+          <Card title="Information Société" subtitle="Ces informations apparaissent sur les factures et documents" className="card-modern">
+            {settings ? (
+              <form onSubmit={handleSave} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input
+                    label="Nom de la Société"
+                    value={settings.name}
+                    onChange={e => setSettings({ ...settings, name: e.target.value })}
+                  />
+                  <Input
+                    label="Capital Social"
+                    value={settings.capital}
+                    onChange={e => setSettings({ ...settings, capital: e.target.value })}
+                  />
+                  <Input
+                    label="Adresse"
+                    value={settings.address}
+                    onChange={e => setSettings({ ...settings, address: e.target.value })}
+                  />
+                  <Input
+                    label="Ville"
+                    value={settings.city}
+                    onChange={e => setSettings({ ...settings, city: e.target.value })}
+                  />
+                  <Input
+                    label="Pays"
+                    value={settings.country}
+                    onChange={e => setSettings({ ...settings, country: e.target.value })}
+                  />
+                  <Input
+                    label="Téléphone"
+                    value={settings.phone}
+                    onChange={e => setSettings({ ...settings, phone: e.target.value })}
+                  />
+                  <Input
+                    label="Email"
+                    value={settings.email}
+                    onChange={e => setSettings({ ...settings, email: e.target.value })}
+                  />
+                </div>
+
+                <h4 className="font-semibold text-gray-700 mt-4 border-b pb-2">Identifiants Légaux</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input
+                    label="NIF"
+                    value={settings.nif}
+                    onChange={e => setSettings({ ...settings, nif: e.target.value })}
+                  />
+                  <Input
+                    label="RC"
+                    value={settings.rc}
+                    onChange={e => setSettings({ ...settings, rc: e.target.value })}
+                  />
+                  <Input
+                    label="NIS"
+                    value={settings.nis}
+                    onChange={e => setSettings({ ...settings, nis: e.target.value })}
+                  />
+                  <Input
+                    label="AI"
+                    value={settings.ai}
+                    onChange={e => setSettings({ ...settings, ai: e.target.value })}
+                  />
+                </div>
+
+                <div className="flex items-center gap-4 pt-4">
+                  <Button type="submit" variant="primary" loading={isSubmitting}>
+                    💾 Enregistrer les modifications
+                  </Button>
+                  {message && <span className={message.startsWith('✅') ? 'text-green-600' : 'text-red-600'}>{message}</span>}
+                </div>
+              </form>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                Impossible de charger les paramètres. Vérifiez la migration de la base de données (backend/migration_v8_company_settings.sql).
               </div>
-            </div>
+            )}
           </Card>
 
-          <Card title="Logs d'Audit" subtitle="Traçabilité" className="card-modern h-full">
-            <div className="space-y-4">
+          <Card title="Gestion des Utilisateurs" subtitle="Via Supabase" className="card-modern">
+            <div className="flex items-center justify-between">
               <p className="text-gray-600">
-                Les logs d'audit enregistrent toutes les modifications de données (créations, modifications, suppressions).
+                Gérez les accès utilisateurs, mots de passe et rôles directement sur Supabase.
               </p>
-              <div className="bg-blue-50 p-4 rounded-xl border border-blue-200 text-sm text-blue-900 font-medium">
-                ℹ️ Les logs sont consultables via la vue SQL : <code className="bg-white px-2 py-1 rounded border border-blue-100 mx-1">public.audit_logs</code>
-              </div>
+              <Button variant="outline" onClick={() => window.open('https://supabase.com/dashboard', '_blank')}>
+                Supabase Dashboard →
+              </Button>
             </div>
           </Card>
         </div>
 
         <div className="mt-8">
-          <Card title="Maintenance Système" subtitle="Opérations sensibles" className="card-modern border-l-4 border-l-yellow-500">
-            <div className="bg-yellow-50/50 p-6 rounded-xl border border-yellow-100">
-              <h3 className="font-bold text-yellow-900 mb-3 flex items-center gap-2">
-                ⚠️ Zone de Danger
-              </h3>
-              <p className="text-sm text-yellow-800 mb-4">
-                Les opérations suivantes ne peuvent être effectuées que par un administrateur ayant les droits "Super Admin" :
-              </p>
-              <ul className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <li className="flex items-center gap-2 text-yellow-900 bg-white p-3 rounded-lg border border-yellow-200 shadow-sm">
-                  🛑 Suppression définitive de comptes
-                </li>
-                <li className="flex items-center gap-2 text-yellow-900 bg-white p-3 rounded-lg border border-yellow-200 shadow-sm">
-                  🔐 Modification des permissions
-                </li>
-                <li className="flex items-center gap-2 text-yellow-900 bg-white p-3 rounded-lg border border-yellow-200 shadow-sm">
-                  🧹 Purge des logs d'audit
-                </li>
-              </ul>
+          <Card title="Maintenance Système" subtitle="Zone de Danger" className="card-modern border-l-4 border-l-red-500">
+            <div className="bg-red-50 p-4 rounded text-red-800">
+              Les opérations de suppression définitive sont irréversibles.
             </div>
           </Card>
         </div>
