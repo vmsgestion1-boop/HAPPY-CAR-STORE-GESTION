@@ -14,9 +14,14 @@ export default function Home() {
       try {
         const { supabase } = await import('@/lib/supabase');
         const { data: { session } } = await supabase.auth.getSession();
-        
+
         if (session) {
-          router.push('/dashboard');
+          const role = session.user?.app_metadata?.role || session.user?.user_metadata?.role || 'viewer';
+          if (role === 'operateur') {
+            router.push('/receptions');
+          } else {
+            router.push('/dashboard');
+          }
         } else {
           router.push('/login');
         }

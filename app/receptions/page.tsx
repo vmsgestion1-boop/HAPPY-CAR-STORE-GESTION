@@ -5,13 +5,14 @@ import { Navigation } from '@/components/navigation';
 import { PageHeader } from '@/components/page-header';
 import { Card, Button, Input, Select, Badge } from '@/components/ui';
 import { fetchOperations, createOperation, updateOperation, deleteOperation, fetchAccounts, createAccount, fetchVehicleDefinitions, createVehicleDefinition } from '@/lib/api';
-import { useRequireAuth } from '@/lib/hooks';
+import { useRequireAuth, useRole } from '@/lib/hooks';
 import { Account, Reception, VehicleDefinition } from '@/lib/types';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import { clsx } from 'clsx';
 
 export default function ReceptionsPage() {
   const { loading: authLoading } = useRequireAuth();
+  const { role, isManager } = useRole();
   const [receptions, setReceptions] = useState<Reception[]>([]);
   const [filteredReceptions, setFilteredReceptions] = useState<Reception[]>([]); // New state
   const [livraisons, setLivraisons] = useState<Reception[]>([]); // To check for sold status
@@ -358,35 +359,37 @@ export default function ReceptionsPage() {
               </div>
 
               {/* Step 2: Pricing */}
-              <div className="p-4 bg-blue-50/50 rounded-xl border border-blue-100">
-                <h3 className="text-sm font-semibold text-blue-800 mb-4 flex items-center gap-2">
-                  <span>💰 Configuration des Prix</span>
-                  <span className="text-xs font-normal text-blue-600">(Par véhicule)</span>
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <Input
-                    label="Prix d'Achat Brût (DA)"
-                    type="number"
-                    value={formData.prix_total_achat}
-                    onChange={(e) => setFormData({ ...formData, prix_total_achat: parseFloat(e.target.value) })}
-                    placeholder="0.00"
-                    required
-                  />
-                  <Input
-                    label="Commission (DA)"
-                    type="number"
-                    value={formData.commission}
-                    onChange={(e) => setFormData({ ...formData, commission: parseFloat(e.target.value) })}
-                    placeholder="0.00"
-                  />
-                  <div>
-                    <label className="block text-sm font-medium text-gray-500 mb-1">Prix de Revient (Calculé)</label>
-                    <div className="text-xl font-bold text-gray-900 h-10 flex items-center">
-                      {formatCurrency(formData.prix_base)}
+              {isManager && (
+                <div className="p-4 bg-blue-50/50 rounded-xl border border-blue-100">
+                  <h3 className="text-sm font-semibold text-blue-800 mb-4 flex items-center gap-2">
+                    <span>💰 Configuration des Prix</span>
+                    <span className="text-xs font-normal text-blue-600">(Par véhicule)</span>
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <Input
+                      label="Prix d'Achat Brût (DA)"
+                      type="number"
+                      value={formData.prix_total_achat}
+                      onChange={(e) => setFormData({ ...formData, prix_total_achat: parseFloat(e.target.value) })}
+                      placeholder="0.00"
+                      required
+                    />
+                    <Input
+                      label="Commission (DA)"
+                      type="number"
+                      value={formData.commission}
+                      onChange={(e) => setFormData({ ...formData, commission: parseFloat(e.target.value) })}
+                      placeholder="0.00"
+                    />
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">Prix de Revient (Calculé)</label>
+                      <div className="text-xl font-bold text-gray-900 h-10 flex items-center">
+                        {formatCurrency(formData.prix_base)}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* Step 3: VIN Entry */}
               <div className="space-y-4">
@@ -455,9 +458,13 @@ export default function ReceptionsPage() {
                     <th>Fournisseur</th>
                     <th>Véhicule</th>
                     <th>VIN</th>
-                    <th className="text-right">Prix HT</th>
-                    <th className="text-right">Commission</th>
-                    <th className="text-right">Total</th>
+                    {isManager && (
+                      <>
+                        <th className="text-right">Prix HT</th>
+                        <th className="text-right">Commission</th>
+                        <th className="text-right">Total</th>
+                      </>
+                    )}
                     <th className="text-center">Actions</th>
                   </tr>
                 </thead>
@@ -472,9 +479,13 @@ export default function ReceptionsPage() {
                         <td>{account?.nom_compte || '---'}</td>
                         <td className="font-semibold">{op.marque} {op.modele}</td>
                         <td className="font-mono text-xs">{op.numero_chassis}</td>
-                        <td className="text-right text-gray-500">{formatCurrency(op.prix_achat || 0)}</td>
-                        <td className="text-right text-green-600 font-medium">+{formatCurrency(op.commission || 0)}</td>
-                        <td className="text-right font-bold">{formatCurrency(op.montant || 0)}</td>
+                        {isManager && (
+                          <>
+                            <td className="text-right text-gray-500">{formatCurrency(op.prix_achat || 0)}</td>
+                            <td className="text-right text-green-600 font-medium">+{formatCurrency(op.commission || 0)}</td>
+                            <td className="text-right font-bold">{formatCurrency(op.montant || 0)}</td>
+                          </>
+                        )}
                         <td className="text-right">
                           <div className="flex gap-2 justify-end">
                             <Badge variant={isSold ? 'success' : 'info'}>

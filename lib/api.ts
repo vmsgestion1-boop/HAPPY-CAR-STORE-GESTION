@@ -332,3 +332,50 @@ export async function updateCompanySettings(settings: Partial<CompanySettings>):
   if (error) throw error;
   return data;
 }
+
+// ============================================================================
+// ADMIN - USER MANAGEMENT
+// ============================================================================
+
+export async function adminCreateUser(userData: any) {
+  const response = await fetch('/api/admin/create-user', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(userData),
+  });
+
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(result.error || 'Erreur lors de la création de l\'utilisateur');
+  }
+
+  return result;
+}
+
+export async function adminListUsers() {
+  const response = await fetch('/api/admin/list-users');
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(result.error || 'Erreur lors du chargement des utilisateurs');
+  }
+  return result;
+}
+
+export async function adminUpdateUser(userId: string, role: string) {
+  const response = await fetch('/api/admin/update-user', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ userId, role }),
+  });
+
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(result.error || 'Erreur lors de la mise à jour de l\'utilisateur');
+  }
+
+  return result;
+}

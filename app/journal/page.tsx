@@ -5,12 +5,13 @@ import { Navigation } from '@/components/navigation';
 import { PageHeader } from '@/components/page-header';
 import { Card, Button, Input, Select, Badge } from '@/components/ui';
 import { fetchOperations, fetchPayments, fetchAccounts, fetchVehicleDefinitions } from '@/lib/api';
-import { useRequireAuth } from '@/lib/hooks';
+import { useRequireAuth, useRole } from '@/lib/hooks';
 import { formatCurrency, formatCurrencySafe, formatDate } from '@/lib/utils';
-import { Account, Reception, Payment, CompanySettings } from '@/lib/types'; // Import CompanySettings
-import { fetchCompanySettings } from '@/lib/api'; // Import API
+import { Account, Reception, Payment, CompanySettings } from '@/lib/types';
+import { fetchCompanySettings } from '@/lib/api';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { useRouter } from 'next/navigation';
 
 // Unified type for display
 interface JournalEntry {
@@ -28,6 +29,18 @@ interface JournalEntry {
 
 export default function JournalPage() {
     const { loading: authLoading } = useRequireAuth();
+    const { role, isManager, loading: roleLoading } = useRole();
+    const router = useRouter();
+
+    useEffect(() => {
+        if (!authLoading && !roleLoading) {
+            if (role === 'operateur') {
+                router.push('/receptions');
+                return;
+            }
+            loadData();
+        }
+    }, [authLoading, roleLoading, role, router]);
 
     // Raw Data
     const [operations, setOperations] = useState<Reception[]>([]);

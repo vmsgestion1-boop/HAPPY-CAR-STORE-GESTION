@@ -1,17 +1,18 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRequireAuth } from '@/lib/hooks';
 import { fetchOperations } from '@/lib/api';
 import { Reception as Operation } from '@/lib/types';
 import { Navigation } from '@/components/navigation';
 import { Card, Badge } from '@/components/ui';
 import { PageHeader } from '@/components/page-header';
 import { formatCurrency, formatDate } from '@/lib/utils';
+import { useRequireAuth, useRole } from '@/lib/hooks';
 import _ from 'lodash';
 
 export default function StockPage() {
     const { loading: authLoading } = useRequireAuth();
+    const { isManager, loading: roleLoading } = useRole();
     const [loading, setLoading] = useState(true);
     const [stock, setStock] = useState<Operation[]>([]);
     const [filteredStock, setFilteredStock] = useState<Operation[]>([]); // New state
@@ -73,7 +74,7 @@ export default function StockPage() {
         setFilteredStock(res);
     }, [search, stock]);
 
-    if (authLoading || loading) return <div className="min-h-screen flex items-center justify-center">⏳ Chargement...</div>;
+    if (authLoading || loading || roleLoading) return <div className="min-h-screen flex items-center justify-center">⏳ Chargement...</div>;
 
     return (
         <div>
@@ -97,15 +98,17 @@ export default function StockPage() {
                         </div>
                     </Card>
 
-                    <Card variant="gradient" className="from-emerald-600 to-emerald-700">
-                        <div className="flex items-center gap-4">
-                            <div className="p-3 bg-white/20 rounded-xl text-2xl">💰</div>
-                            <div>
-                                <p className="text-emerald-100 font-medium">Valeur Totale du Stock</p>
-                                <div className="text-3xl font-bold">{formatCurrency(stats.totalValue)}</div>
+                    {isManager && (
+                        <Card variant="gradient" className="from-emerald-600 to-emerald-700">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-white/20 rounded-xl text-2xl">💰</div>
+                                <div>
+                                    <p className="text-emerald-100 font-medium">Valeur Totale du Stock</p>
+                                    <div className="text-3xl font-bold">{formatCurrency(stats.totalValue)}</div>
+                                </div>
                             </div>
-                        </div>
-                    </Card>
+                        </Card>
+                    )}
                 </div>
 
                 {/* Stock Table */}
@@ -144,9 +147,9 @@ export default function StockPage() {
                                     <th className="text-left py-4 px-4 font-semibold text-gray-600">Véhicule</th>
                                     <th className="text-left py-4 px-4 font-semibold text-gray-600">VIN (Châssis)</th>
                                     <th className="text-left py-4 px-4 font-semibold text-gray-600">Date Entrée</th>
-                                    <th className="text-right py-4 px-4 font-semibold text-gray-600">Prix Achat (Base)</th>
-                                    <th className="text-right py-4 px-4 font-semibold text-gray-600">Commission</th>
-                                    <th className="text-right py-4 px-4 font-semibold text-gray-600">Prix Revient (Total)</th>
+                                    {isManager && <th className="text-right py-4 px-4 font-semibold text-gray-600">Prix Achat (Base)</th>}
+                                    {isManager && <th className="text-right py-4 px-4 font-semibold text-gray-600">Commission</th>}
+                                    {isManager && <th className="text-right py-4 px-4 font-semibold text-gray-600">Prix Revient (Total)</th>}
                                     <th className="text-center py-4 px-4 font-semibold text-gray-600">Statut</th>
                                 </tr>
                             </thead>
@@ -170,15 +173,21 @@ export default function StockPage() {
                                             <td className="py-4 px-4 text-gray-600">
                                                 {formatDate(item.date_operation)}
                                             </td>
-                                            <td className="py-4 px-4 text-right text-gray-600 font-medium">
-                                                {formatCurrency(item.prix_achat || 0)}
-                                            </td>
-                                            <td className="py-4 px-4 text-right text-emerald-600">
-                                                + {formatCurrency(item.commission || 0)}
-                                            </td>
-                                            <td className="py-4 px-4 text-right font-bold text-gray-900">
-                                                {formatCurrency(item.montant || 0)}
-                                            </td>
+                                            {isManager && (
+                                                <td className="py-4 px-4 text-right text-gray-600 font-medium">
+                                                    {formatCurrency(item.prix_achat || 0)}
+                                                </td>
+                                            )}
+                                            {isManager && (
+                                                <td className="py-4 px-4 text-right text-emerald-600">
+                                                    + {formatCurrency(item.commission || 0)}
+                                                </td>
+                                            )}
+                                            {isManager && (
+                                                <td className="py-4 px-4 text-right font-bold text-gray-900">
+                                                    {formatCurrency(item.montant || 0)}
+                                                </td>
+                                            )}
                                             <td className="py-4 px-4 text-center">
                                                 <Badge variant="success" size="sm">En Stock</Badge>
                                             </td>

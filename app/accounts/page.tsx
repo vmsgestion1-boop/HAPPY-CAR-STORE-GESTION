@@ -5,11 +5,12 @@ import { Navigation } from '@/components/navigation';
 import { PageHeader } from '@/components/page-header';
 import { Card, Button, Input, Select, Badge } from '@/components/ui';
 import { fetchAccounts, createAccount, updateAccount, deleteAccount } from '@/lib/api';
-import { useRequireAuth } from '@/lib/hooks';
+import { useRequireAuth, useRole } from '@/lib/hooks';
 import { Account } from '@/lib/types';
 
 export default function AccountsPage() {
   const { loading: authLoading } = useRequireAuth();
+  const { isManager, loading: roleLoading } = useRole();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [filteredAccounts, setFilteredAccounts] = useState<Account[]>([]);
   const [search, setSearch] = useState('');
@@ -120,7 +121,7 @@ export default function AccountsPage() {
     }
   }
 
-  if (authLoading || loading) {
+  if (authLoading || loading || roleLoading) {
     return <div className="min-h-screen flex items-center justify-center">⏳ Chargement...</div>;
   }
 
@@ -317,13 +318,15 @@ export default function AccountsPage() {
                           >
                             ✏️ Modifier
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="danger"
-                            onClick={() => handleDelete(account.id)}
-                          >
-                            🗑️ Supprimer
-                          </Button>
+                          {isManager && (
+                            <Button
+                              size="sm"
+                              variant="danger"
+                              onClick={() => handleDelete(account.id)}
+                            >
+                              🗑️ Supprimer
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>

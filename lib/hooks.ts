@@ -33,19 +33,24 @@ export function useRequireAuth() {
 
 export function useUser() {
   const [user, setUser] = useState<any>(null);
+  const [role, setRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const getUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user || null);
+      const user = session?.user || null;
+      setUser(user);
+      setRole(user?.app_metadata?.role || user?.user_metadata?.role || 'viewer');
       setLoading(false);
     };
 
     getUser();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user || null);
+      const user = session?.user || null;
+      setUser(user);
+      setRole(user?.app_metadata?.role || user?.user_metadata?.role || 'viewer');
     });
 
     return () => {
@@ -53,5 +58,15 @@ export function useUser() {
     };
   }, []);
 
-  return { user, loading };
+  return { user, role, loading };
+}
+
+export function useRole() {
+  const { role, loading } = useUser();
+
+  const isAdmin = role === 'admin';
+  const isManager = role === 'manager' || isAdmin;
+  const isOperator = role === 'operateur' || isManager;
+
+  return { role, isAdmin, isManager, isOperator, loading };
 }

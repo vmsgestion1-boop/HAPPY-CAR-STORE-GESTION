@@ -7,13 +7,14 @@ import { Navigation } from '@/components/navigation';
 import { PageHeader } from '@/components/page-header';
 import { Card, Button, Input, Select } from '@/components/ui';
 import { fetchOperations, createOperation, updateOperation, deleteOperation, fetchAccounts, createAccount, fetchCompanySettings } from '@/lib/api';
-import { useRequireAuth } from '@/lib/hooks';
+import { useRequireAuth, useRole } from '@/lib/hooks';
 import { Account, Reception, CompanySettings } from '@/lib/types';
 import { formatDate, formatCurrency, formatCurrencySafe } from '@/lib/utils';
 import _ from 'lodash';
 
 export default function LivraisonsPage() {
   const { loading: authLoading } = useRequireAuth();
+  const { isManager, loading: roleLoading } = useRole();
   const [livraisons, setLivraisons] = useState<Reception[]>([]);
   const [filteredLivraisons, setFilteredLivraisons] = useState<Reception[]>([]); // New state
   const [stock, setStock] = useState<Reception[]>([]);
@@ -364,7 +365,7 @@ export default function LivraisonsPage() {
     }
   }
 
-  if (authLoading || loading) return <div className="min-h-screen flex items-center justify-center">⏳ Chargement...</div>;
+  if (authLoading || loading || roleLoading) return <div className="min-h-screen flex items-center justify-center">⏳ Chargement...</div>;
 
   return (
     <div>
@@ -466,23 +467,25 @@ export default function LivraisonsPage() {
                 </div>
               </div>
 
-              {/* Pricing Display (Read Only) */}
-              <div className="p-5 bg-green-50/50 rounded-xl border border-green-100">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-500 mb-1">Prix Achat Base</label>
-                    <div className="text-xl font-mono text-gray-700">{formatCurrency(formData.prix_achat)}</div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-green-600 mb-1">Commission</label>
-                    <div className="text-xl font-bold text-green-700">+{formatCurrency(formData.commission)}</div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-1">Prix de Vente Total</label>
-                    <div className="text-2xl font-bold text-gray-900">{formatCurrency(formData.prix_unitaire)}</div>
+              {/* Pricing Display (Read Only) - Only for Managers */}
+              {isManager && (
+                <div className="p-5 bg-green-50/50 rounded-xl border border-green-100">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">Prix Achat Base</label>
+                      <div className="text-xl font-mono text-gray-700">{formatCurrency(formData.prix_achat)}</div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-green-600 mb-1">Commission</label>
+                      <div className="text-xl font-bold text-green-700">+{formatCurrency(formData.commission)}</div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-900 mb-1">Prix de Vente Total</label>
+                      <div className="text-2xl font-bold text-gray-900">{formatCurrency(formData.prix_unitaire)}</div>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               <div className="flex gap-3 pt-2">
                 <Button type="submit" variant="success" size="lg" loading={isSubmitting} disabled={isSubmitting}>
@@ -525,8 +528,8 @@ export default function LivraisonsPage() {
                     <th>Client</th>
                     <th>Véhicule</th>
                     <th>VIN</th>
-                    <th className="text-right">Prix Base</th>
-                    <th className="text-center bg-green-50">Commission</th>
+                    {isManager && <th className="text-right">Prix Base</th>}
+                    {isManager && <th className="text-center bg-green-50">Commission</th>}
                     <th className="text-right">Total Vente</th>
                     <th className="text-center">Actions</th>
                   </tr>
@@ -541,16 +544,20 @@ export default function LivraisonsPage() {
                         <td>{account?.nom_compte}</td>
                         <td className="font-semibold">{op.marque} {op.modele}</td>
                         <td className="font-mono text-xs">{op.numero_chassis}</td>
-                        <td className="text-right text-gray-500">{formatCurrency(op.prix_achat || 0)}</td>
-                        <td className="text-center bg-green-50/30">
-                          <span className="font-bold text-green-700">+{formatCurrency(commission)}</span>
-                        </td>
+                        {isManager && <td className="text-right text-gray-500">{formatCurrency(op.prix_achat || 0)}</td>}
+                        {isManager && (
+                          <td className="text-center bg-green-50/30">
+                            <span className="font-bold text-green-700">+{formatCurrency(commission)}</span>
+                          </td>
+                        )}
                         <td className="text-right font-bold">{formatCurrency(op.montant)}</td>
                         <td className="text-center">
                           <div className="flex gap-2 justify-center">
                             <Button size="sm" variant="outline" onClick={() => generateDeliveryNote(op)} title="Imprimer BL">🖨️</Button>
                             <Button size="sm" variant="outline" onClick={() => handleEdit(op)} title="Modifier">✏️</Button>
-                            <Button size="sm" variant="danger" onClick={() => { if (confirm('Supprimer?')) deleteOperation(op.id).then(loadData); }}>×</Button>
+                            {isManager && (
+                              <Button size="sm" variant="danger" onClick={() => { if (confirm('Supprimer?')) deleteOperation(op.id).then(loadData); }}>×</Button>
+                            )}
                           </div>
                         </td>
                       </tr>

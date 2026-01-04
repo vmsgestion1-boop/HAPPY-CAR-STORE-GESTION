@@ -5,12 +5,13 @@ import { Navigation } from '@/components/navigation';
 import { PageHeader } from '@/components/page-header';
 import { Card, Button, Input, Select } from '@/components/ui';
 import { fetchCharges, createCharge, deleteCharge, fetchAccounts } from '@/lib/api';
-import { useRequireAuth } from '@/lib/hooks';
+import { useRequireAuth, useRole } from '@/lib/hooks';
 import { Account, Charge } from '@/lib/types';
 import { formatDate, formatCurrency } from '@/lib/utils';
 
 export default function ChargesPage() {
   const { loading: authLoading } = useRequireAuth();
+  const { isManager, loading: roleLoading } = useRole();
   const [charges, setCharges] = useState<Charge[]>([]);
   const [filteredCharges, setFilteredCharges] = useState<Charge[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -84,7 +85,7 @@ export default function ChargesPage() {
     }
   }
 
-  if (authLoading || loading) {
+  if (authLoading || loading || roleLoading) {
     return <div className="min-h-screen flex items-center justify-center">⏳ Chargement...</div>;
   }
 
@@ -238,17 +239,19 @@ export default function ChargesPage() {
                           -{formatCurrency(charge.montant)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
-                          <Button
-                            size="sm"
-                            variant="danger"
-                            onClick={() => {
-                              if (confirm('Êtes-vous sûr ?')) {
-                                deleteCharge(charge.id).then(() => loadData());
-                              }
-                            }}
-                          >
-                            🗑️ Supprimer
-                          </Button>
+                          {isManager && (
+                            <Button
+                              size="sm"
+                              variant="danger"
+                              onClick={() => {
+                                if (confirm('Êtes-vous sûr ?')) {
+                                  deleteCharge(charge.id).then(() => loadData());
+                                }
+                              }}
+                            >
+                              🗑️ Supprimer
+                            </Button>
+                          )}
                         </td>
                       </tr>
                     );

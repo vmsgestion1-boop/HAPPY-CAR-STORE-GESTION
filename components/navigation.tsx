@@ -1,11 +1,13 @@
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import clsx from 'clsx';
+import { useRole } from '@/lib/hooks';
+import { clsx } from 'clsx';
 
 export function Navigation() {
   const router = useRouter();
   const pathname = usePathname();
+  const { role } = useRole();
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -13,7 +15,7 @@ export function Navigation() {
   };
 
   const navItems = [
-    { label: 'Tableau de bord', href: '/dashboard', icon: '📊' },
+    { label: 'Tableau de bord', href: '/dashboard', icon: '📊', roles: ['admin', 'manager'] },
     { label: 'Comptes', href: '/accounts', icon: '👥' },
     { label: 'Réceptions', href: '/receptions', icon: '📥' },
     { label: 'Véhicules', href: '/vehicules', icon: '🚗' },
@@ -22,16 +24,21 @@ export function Navigation() {
     { label: 'Charges', href: '/charges', icon: '💰' },
     { label: 'Finance', href: '/finance', icon: '🏦' },
     { label: 'Relevés', href: '/statements', icon: '📋' },
-    { label: 'Journal Global', href: '/journal', icon: '📑' },
-    { label: 'Admin', href: '/admin', icon: '⚙️' },
+    { label: 'Journal Global', href: '/journal', icon: '📑', roles: ['admin', 'manager'] },
+    { label: 'Admin', href: '/admin', icon: '⚙️', roles: ['admin'] },
   ];
+
+  const filteredItems = navItems.filter(item => {
+    if (!item.roles) return true;
+    return item.roles.includes(role || 'viewer');
+  });
 
   return (
     <nav className="sticky top-0 z-50 bg-gradient-to-r from-primary-600 via-primary-700 to-accent-600 shadow-xl backdrop-blur-lg">
       <div className="max-w-[98%] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16 gap-8">
           {/* Logo */}
-          <Link href="/dashboard" className="flex items-center space-x-3 font-bold text-xl text-white hover:text-white/90 transition-colors flex-shrink-0">
+          <Link href={role === 'operateur' ? '/receptions' : '/dashboard'} className="flex items-center space-x-3 font-bold text-xl text-white hover:text-white/90 transition-colors flex-shrink-0">
             <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-xl">
               📊
             </div>
@@ -40,7 +47,7 @@ export function Navigation() {
 
           {/* Nav Items */}
           <div className="flex items-center space-x-1 overflow-x-auto flex-1">
-            {navItems.map((item) => {
+            {filteredItems.map((item) => {
               const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
               return (
                 <Link
