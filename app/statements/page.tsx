@@ -228,7 +228,8 @@ export default function StatementsPage() {
                         <span className={`px-2 py-1 rounded text-sm ${stmt.type_operation === 'reception' ? 'bg-amber-100 text-amber-800' :
                           stmt.type_operation === 'livraison' ? 'bg-green-100 text-green-800' :
                             stmt.type_operation === 'charge' ? 'bg-red-100 text-red-800' :
-                              'bg-gray-100 text-gray-800'
+                              stmt.type_operation === 'payment' ? 'bg-blue-100 text-blue-800' :
+                                'bg-gray-100 text-gray-800'
                           }`}>
                           {stmt.type_operation}
                         </span>

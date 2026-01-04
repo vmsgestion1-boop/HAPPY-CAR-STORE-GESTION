@@ -64,16 +64,11 @@ export default function DashboardPage() {
       .filter(op => op.type_operation === 'reception')
       .reduce((sum, op) => sum + (op.montant || 0), 0);
 
-    // 4. Client Balances (What clients owe us - usually negative in some accounting, or positive depending on convention)
-    // Assuming 'client' type accounts. Positive balance = They owe us? Or We owe them?
-    // Let's assume Credit (Positive) = User has money in system. Debit (Negative) = User owes money.
-    // Actually, usually in VMS:
-    // Client buys car -> Debit Account.
-    // Client pays -> Credit Account.
-    // If Balance < 0, Client Owes Money.
+    // 4. Client Balances (What clients owe us)
+    // Client owes us if solde_actuel < 0
     const clientBalances = bals
-      .filter(b => b.type_compte === 'client')
-      .reduce((sum, b) => sum + (b.solde_actuel || 0), 0);
+      .filter(b => b.type_compte === 'client' && b.solde_actuel < 0)
+      .reduce((sum, b) => sum + Math.abs(b.solde_actuel || 0), 0);
 
     // 5. Total Payments (Cash Flow - Just a sum of all recorded payments for now)
     const totalPayments = pays.reduce((sum, p) => sum + (p.montant || 0), 0);

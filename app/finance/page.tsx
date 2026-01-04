@@ -38,8 +38,10 @@ export default function FinancePage() {
     const [error, setError] = useState('');
 
     // Computed totals
-    const totalCreances = balances.filter(b => b.solde_actuel > 0 && b.type_compte === 'client').reduce((acc, curr) => acc + curr.solde_actuel, 0);
-    const totalDettes = balances.filter(b => b.solde_actuel < 0 && b.type_compte === 'fournisseur').reduce((acc, curr) => acc + Math.abs(curr.solde_actuel), 0);
+    // Creances (Clients): Client owes us if solde_actuel < 0 (due to livraisons being -)
+    const totalCreances = balances.filter(b => b.solde_actuel < 0 && b.type_compte === 'client').reduce((acc, curr) => acc + Math.abs(curr.solde_actuel), 0);
+    // Dettes (Fournisseurs): We owe supplier if solde_actuel > 0 (due to receptions being +)
+    const totalDettes = balances.filter(b => b.solde_actuel > 0 && b.type_compte === 'fournisseur').reduce((acc, curr) => acc + curr.solde_actuel, 0);
 
     // Filter Effect
     useEffect(() => {
@@ -91,7 +93,7 @@ export default function FinancePage() {
             await createPayment(formData);
             setFormData({
                 account_id: '',
-                date_paiement: '',
+                date_paiement: new Date().toISOString().split('T')[0],
                 type_paiement: 'encaissement',
                 montant: 0,
                 mode_paiement: 'virement',
@@ -103,6 +105,23 @@ export default function FinancePage() {
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to save payment');
         }
+    }
+
+    function handleSettle(balance: AccountBalance) {
+        const amount = Math.abs(balance.solde_actuel);
+        const type = balance.type_compte === 'client' ? 'encaissement' : 'decaissement';
+
+        setFormData({
+            account_id: balance.account_id,
+            date_paiement: new Date().toISOString().split('T')[0],
+            type_paiement: type,
+            montant: amount,
+            mode_paiement: 'especes',
+            reference: 'Règlement Solde',
+            description: `Règlement total du solde pour ${balance.nom_compte}`,
+        });
+        setShowForm(true);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     if (authLoading || loading) {
@@ -283,18 +302,36 @@ export default function FinancePage() {
                                         <th className="px-2">Compte</th>
                                         <th className="px-2">Type</th>
                                         <th className="px-2 text-right">Solde</th>
+                                        <th className="px-2 text-center">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {balances.filter(b => b.solde_actuel !== 0).slice(0, 10).map((b) => (
-                                        <tr key={b.account_id} className="hover:bg-gray-50">
-                                            <td className="px-2 py-2 font-medium">{b.nom_compte}</td>
-                                            <td className="px-2 py-2 capitalize text-gray-500">{b.type_compte}</td>
-                                            <td className={clsx("px-2 py-2 text-right font-bold", b.solde_actuel > 0 ? 'text-green-600' : 'text-red-600')}>
-                                                {formatCurrency(b.solde_actuel)}
-                                            </td>
-                                        </tr>
-                                    ))}
+                                    {balances.filter(b => Math.abs(b.solde_actuel) > 0.01).map((b) => {
+                                        const isClient = b.type_compte === 'client';
+                                        const isDebt = isClient ? b.solde_actuel < 0 : b.solde_actuel > 0;
+                                        return (
+                                            <tr key={b.account_id} className="hover:bg-gray-50">
+                                                <td className="px-2 py-2 font-medium">{b.nom_compte}</td>
+                                                <td className="px-2 py-2 capitalize text-gray-500">{b.type_compte}</td>
+                                                <td className={clsx("px-2 py-2 text-right font-bold", isDebt ? 'text-red-600' : 'text-green-600')}>
+                                                    {formatCurrency(Math.abs(b.solde_actuel))}
+                                                    <span className="text-[10px] ml-1 opacity-50">
+                                                        {isDebt ? '(À payer/recevoir)' : '(Crédit)'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-2 py-2 text-center">
+                                                    <Button
+                                                        size="sm"
+                                                        variant={isDebt ? "primary" : "outline"}
+                                                        onClick={() => handleSettle(b)}
+                                                        className="h-7 text-[10px] px-2"
+                                                    >
+                                                        {isDebt ? '💰 Solder' : '💸 Ajuster'}
+                                                    </Button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>
