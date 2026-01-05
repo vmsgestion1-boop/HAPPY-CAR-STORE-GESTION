@@ -19,8 +19,14 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await signIn(email, password);
-      router.push('/dashboard');
+      const { user } = await signIn(email, password);
+      const role = user?.app_metadata?.role || user?.user_metadata?.role || 'viewer';
+
+      if (role === 'operateur') {
+        router.push('/receptions');
+      } else {
+        router.push('/dashboard');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Authentication failed');
     } finally {
