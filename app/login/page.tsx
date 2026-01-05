@@ -51,7 +51,7 @@ export default function LoginPage() {
           <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-primary-600 to-accent-600 rounded-3xl mb-6 shadow-xl hover:shadow-2xl transition-all">
             <span className="text-4xl">📊</span>
           </div>
-          <h1 className="text-5xl font-bold gradient-text mb-3">VMS Gestion</h1>
+          <h1 className="text-4xl font-bold gradient-text mb-3">SARL HAPPY CAR STORE</h1>
           <p className="text-gray-600 text-lg font-medium">Gestion simplifiée de votre métier</p>
         </div>
 

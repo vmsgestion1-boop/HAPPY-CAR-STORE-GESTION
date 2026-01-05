@@ -42,7 +42,7 @@ export function Navigation() {
             <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-xl">
               📊
             </div>
-            <span className="hidden sm:inline">VMS Gestion</span>
+            <span className="hidden sm:inline">SARL HAPPY CAR STORE</span>
           </Link>
 
           {/* Nav Items */}

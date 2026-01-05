@@ -2,8 +2,8 @@ import '@/app/globals.css';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'VMS Gestion - Application Moderne',
-  description: 'Plateforme de gestion intelligente et intuitive',
+  title: 'SARL HAPPY CAR STORE',
+  description: 'Application de gestion automobile',
 };
 
 export default function RootLayout({
