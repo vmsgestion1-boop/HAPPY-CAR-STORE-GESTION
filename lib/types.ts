@@ -125,5 +125,6 @@ export interface Payment {
   mode_paiement: string;
   reference: string;
   description: string;
+  operation_id?: string;
   created_at: string;
 }

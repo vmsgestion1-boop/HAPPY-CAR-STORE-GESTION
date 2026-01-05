@@ -5,15 +5,18 @@ import { Navigation } from '@/components/navigation';
 import { PageHeader } from '@/components/page-header';
 import { Card, Button, Input, Select } from '@/components/ui';
 import { fetchAccountStatement, fetchAccounts, fetchCompanySettings } from '@/lib/api';
-import { useRequireAuth } from '@/lib/hooks';
+import { useRequireAuth, useRole } from '@/lib/hooks';
 import { Account, AccountStatement, CompanySettings } from '@/lib/types';
 import { formatDate, formatCurrency, formatCurrencySafe, downloadFile } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 
 export default function StatementsPage() {
+  const router = useRouter();
   const { loading: authLoading } = useRequireAuth();
+  const { role, loading: roleLoading } = useRole();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [statements, setStatements] = useState<AccountStatement[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,10 +27,14 @@ export default function StatementsPage() {
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
 
   useEffect(() => {
-    if (!authLoading) {
+    if (!authLoading && !roleLoading) {
+      if (role === 'operateur') {
+        router.push('/receptions');
+        return;
+      }
       loadAccounts();
     }
-  }, [authLoading]);
+  }, [authLoading, roleLoading, role]);
 
   async function loadAccounts() {
     try {
@@ -148,9 +155,11 @@ export default function StatementsPage() {
     XLSX.writeFile(wb, `releve_${account?.code_compte}_${new Date().toISOString().split('T')[0]}.xlsx`);
   }
 
-  if (authLoading || loading) {
+  if (authLoading || loading || roleLoading) {
     return <div className="min-h-screen flex items-center justify-center">⏳ Chargement...</div>;
   }
+
+  if (role === 'operateur') return null;
 
   return (
     <div>

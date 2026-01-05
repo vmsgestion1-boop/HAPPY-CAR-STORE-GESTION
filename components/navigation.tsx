@@ -21,9 +21,9 @@ export function Navigation() {
     { label: 'Véhicules', href: '/vehicules', icon: '🚗' },
     { label: 'Livraisons', href: '/livraisons', icon: '📤' },
     { label: 'Stock', href: '/stock', icon: '🅿️' },
-    { label: 'Charges', href: '/charges', icon: '💰' },
-    { label: 'Finance', href: '/finance', icon: '🏦' },
-    { label: 'Relevés', href: '/statements', icon: '📋' },
+    { label: 'Charges', href: '/charges', icon: '💰', roles: ['admin', 'manager'] },
+    { label: 'Finance', href: '/finance', icon: '🏦', roles: ['admin', 'manager'] },
+    { label: 'Relevés', href: '/statements', icon: '📋', roles: ['admin', 'manager'] },
     { label: 'Journal Global', href: '/journal', icon: '📑', roles: ['admin', 'manager'] },
     { label: 'Admin', href: '/admin', icon: '⚙️', roles: ['admin'] },
   ];

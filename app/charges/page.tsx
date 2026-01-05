@@ -8,10 +8,12 @@ import { fetchCharges, createCharge, deleteCharge, fetchAccounts } from '@/lib/a
 import { useRequireAuth, useRole } from '@/lib/hooks';
 import { Account, Charge } from '@/lib/types';
 import { formatDate, formatCurrency } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
 
 export default function ChargesPage() {
+  const router = useRouter();
   const { loading: authLoading } = useRequireAuth();
-  const { isManager, loading: roleLoading } = useRole();
+  const { role, isManager, loading: roleLoading } = useRole();
   const [charges, setCharges] = useState<Charge[]>([]);
   const [filteredCharges, setFilteredCharges] = useState<Charge[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -29,10 +31,14 @@ export default function ChargesPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!authLoading) {
+    if (!authLoading && !roleLoading) {
+      if (role === 'operateur') {
+        router.push('/receptions');
+        return;
+      }
       loadData();
     }
-  }, [authLoading]);
+  }, [authLoading, roleLoading, role]);
 
   useEffect(() => {
     let currentCharges = [...charges];
@@ -88,6 +94,8 @@ export default function ChargesPage() {
   if (authLoading || loading || roleLoading) {
     return <div className="min-h-screen flex items-center justify-center">⏳ Chargement...</div>;
   }
+
+  if (role === 'operateur') return null;
 
   return (
     <div>

@@ -5,13 +5,16 @@ import { Navigation } from '@/components/navigation';
 import { PageHeader } from '@/components/page-header';
 import { Card, Button, Input, Select, Badge } from '@/components/ui';
 import { fetchAccountBalances, fetchPayments, createPayment, fetchAccounts } from '@/lib/api';
-import { useRequireAuth } from '@/lib/hooks';
+import { useRequireAuth, useRole } from '@/lib/hooks';
 import { Account, AccountBalance, Payment } from '@/lib/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
 import clsx from 'clsx';
 
 export default function FinancePage() {
+    const router = useRouter();
     const { loading: authLoading } = useRequireAuth();
+    const { role, loading: roleLoading } = useRole();
     const [balances, setBalances] = useState<AccountBalance[]>([]);
     const [payments, setPayments] = useState<Payment[]>([]);
     const [accounts, setAccounts] = useState<Account[]>([]);
@@ -64,10 +67,14 @@ export default function FinancePage() {
     }, [filters, payments, accounts]);
 
     useEffect(() => {
-        if (!authLoading) {
+        if (!authLoading && !roleLoading) {
+            if (role === 'operateur') {
+                router.push('/receptions');
+                return;
+            }
             loadData();
         }
-    }, [authLoading]);
+    }, [authLoading, roleLoading, role]);
 
     async function loadData() {
         try {
@@ -124,9 +131,11 @@ export default function FinancePage() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    if (authLoading || loading) {
+    if (authLoading || loading || roleLoading) {
         return <div className="min-h-screen flex items-center justify-center">⏳ Chargement...</div>;
     }
+
+    if (role === 'operateur') return null;
 
     return (
         <div>

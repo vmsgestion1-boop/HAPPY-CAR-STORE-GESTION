@@ -6,10 +6,11 @@ import { useEffect, useState } from 'react';
 import { Navigation } from '@/components/navigation';
 import { PageHeader } from '@/components/page-header';
 import { Card, Button, Input, Select } from '@/components/ui';
-import { fetchOperations, createOperation, updateOperation, deleteOperation, fetchAccounts, createAccount, fetchCompanySettings } from '@/lib/api';
+import { fetchOperations, createOperation, updateOperation, deleteOperation, fetchAccounts, createAccount, fetchCompanySettings, fetchPayments, createPayment } from '@/lib/api';
 import { useRequireAuth, useRole } from '@/lib/hooks';
-import { Account, Reception, CompanySettings } from '@/lib/types';
+import { Account, Reception, CompanySettings, Payment } from '@/lib/types';
 import { formatDate, formatCurrency, formatCurrencySafe } from '@/lib/utils';
+import clsx from 'clsx';
 import _ from 'lodash';
 
 export default function LivraisonsPage() {
@@ -27,9 +28,28 @@ export default function LivraisonsPage() {
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
 
+  // Payment State
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [maxPayment, setMaxPayment] = useState(0);
+  const [paymentFormData, setPaymentFormData] = useState({
+    account_id: '',
+    date_paiement: new Date().toISOString().split('T')[0],
+    type_paiement: 'encaissement' as const,
+    montant: 0,
+    mode_paiement: 'especes',
+    reference: '',
+    description: '',
+    operation_id: '',
+  });
+
   // Inline Creation State
   const [showAccountForm, setShowAccountForm] = useState(false);
   const [newAccount, setNewAccount] = useState({ nom_compte: '', code_compte: '' });
+
+  // Details Modal
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [selectedDetailsOp, setSelectedDetailsOp] = useState<Reception | null>(null);
 
   // Selection Logic
   const [selectedModel, setSelectedModel] = useState(''); // "Marque Model"
@@ -69,10 +89,11 @@ export default function LivraisonsPage() {
 
   async function loadData() {
     try {
-      const [ops, accs, settings] = await Promise.all([
+      const [ops, accs, settings, pays] = await Promise.all([
         fetchOperations(),
         fetchAccounts(),
-        fetchCompanySettings()
+        fetchCompanySettings(),
+        fetchPayments()
       ]);
 
       const livs = ops.filter((op) => op.type_operation === 'livraison');
@@ -90,6 +111,7 @@ export default function LivraisonsPage() {
       setAvailableModels(models);
       setAccounts(accs);
       setCompanySettings(settings);
+      setPayments(pays);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load data');
     } finally {
@@ -170,6 +192,49 @@ export default function LivraisonsPage() {
     }
   }
 
+  const handleQuickPayment = (op: Reception) => {
+    const opPayments = payments.filter(p => p.operation_id === op.id);
+    const totalPaid = _.sumBy(opPayments, 'montant');
+    const remaining = Math.max(0, op.montant - totalPaid);
+
+    setPaymentFormData({
+      account_id: op.account_id,
+      date_paiement: new Date().toISOString().split('T')[0],
+      type_paiement: 'encaissement',
+      montant: remaining,
+      mode_paiement: 'especes',
+      reference: `Paiement BL ${op.numero_chassis?.substring(0, 10) || op.id.substring(0, 8)}`,
+      description: `Paiement pour livraison ${op.marque} ${op.modele} ${op.numero_chassis || ''}`,
+      operation_id: op.id,
+    });
+    setMaxPayment(remaining);
+    setShowPaymentModal(true);
+  };
+
+  async function handlePaymentSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (paymentFormData.montant <= 0) {
+      alert("Le montant doit être supérieur à 0");
+      return;
+    }
+    if (paymentFormData.montant > maxPayment + 0.01) { // small tolerance for float
+      alert("Le montant dépasse le solde du bon");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await createPayment(paymentFormData);
+      setShowPaymentModal(false);
+      await loadData();
+      alert("Paiement enregistré avec succès");
+    } catch (err) {
+      alert("Erreur lors de l'enregistrement du paiement");
+    } finally {
+      setLoading(false);
+    }
+  }
+
 
   // PDF Generation Function
   const generateDeliveryNote = (op: Reception) => {
@@ -177,63 +242,73 @@ export default function LivraisonsPage() {
     const doc = new jsPDF();
 
     // Header
-    doc.setFontSize(22);
-    doc.setTextColor(40, 40, 40);
-    doc.text('BON DE LIVRAISON', 20, 20);
+    doc.setFontSize(26);
+    doc.setTextColor(50, 50, 50);
+    doc.text('BON DE LIVRAISON', 15, 22);
 
     doc.setFontSize(10);
-    doc.setTextColor(100, 100, 100);
-    doc.text(`N° Ops: ${op.id.substring(0, 8).toUpperCase()}`, 20, 30);
-    doc.text(`Date: ${formatDate(op.date_operation)}`, 20, 35);
+    doc.setTextColor(110, 110, 110);
+    doc.text(`N° Ops: ${op.id.substring(0, 8).toUpperCase()}`, 15, 32);
+    doc.text(`Date: ${formatDate(op.date_operation)}`, 15, 38);
 
-    // Company Info
-    const company = companySettings || {
-      name: 'VMS AUTOMOBILES',
-      address: 'Zone Industrielle',
+    // Company Info (Right aligned)
+    const company = {
+      name: 'SARL HAPPY CAR STORE',
+      address: 'CHERARBA EUCALYPTUS',
       city: 'Alger',
       country: 'Algérie',
-      phone: '+213 555 00 00 00',
-      email: 'contact@vms.dz',
-      capital: '10 000 000 DA',
-      rc: '16/00-0000000',
-      nif: '0000000000',
-      nis: '0000000000',
-      ai: '0000000000'
+      phone: '+213 770 935 445',
+      email: 'contact@vms-autos.dz',
+      capital: '20 000 000.00 DA',
+      rc: '16/00-1234567B16',
+      nif: '001616123456789',
+      nis: '001216012345678',
+      ai: '001234567890123'
     };
 
-    doc.setFontSize(12);
+    doc.setFontSize(14);
     doc.setTextColor(0, 0, 0);
-    doc.text(company.name, 195, 20, { align: 'right' });
+    doc.setFont('helvetica', 'bold');
+    doc.text(company.name, 195, 22, { align: 'right' });
+
+    doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
     doc.setTextColor(100, 100, 100);
-    doc.text(company.address, 195, 26, { align: 'right' });
-    doc.text(`${company.city}, ${company.country}`, 195, 31, { align: 'right' });
-    doc.text(`Tel: ${company.phone}`, 195, 36, { align: 'right' });
-    doc.text(`Email: ${company.email}`, 195, 41, { align: 'right' });
-    doc.text(`RC: ${company.rc} | Capital: ${company.capital || '-'}`, 195, 46, { align: 'right' });
-    doc.text(`NIF: ${company.nif} | NIS: ${company.nis}`, 195, 51, { align: 'right' });
-    doc.text(`AI: ${company.ai}`, 195, 56, { align: 'right' });
+    doc.text(company.address, 195, 29, { align: 'right' });
+    doc.text(`${company.city}, ${company.country}`, 195, 35, { align: 'right' });
+    doc.text(`Tel: ${company.phone}`, 195, 41, { align: 'right' });
+    doc.text(`Email: ${company.email}`, 195, 47, { align: 'right' });
+    doc.text(`RC: ${company.rc} | Capital: ${company.capital}`, 195, 53, { align: 'right' });
+    doc.text(`NIF: ${company.nif} | NIS: ${company.nis}`, 195, 59, { align: 'right' });
+    doc.text(`AI: ${company.ai}`, 195, 65, { align: 'right' });
 
-    // Client Info
-    doc.setFillColor(245, 247, 250);
-    doc.roundedRect(20, 50, 170, 35, 3, 3, 'F');
+    // Client Info Container
+    const clientBoxY = 75;
+    doc.setFillColor(248, 250, 252); // Light Slate color for modern feel
+    doc.roundedRect(15, clientBoxY, 180, 45, 4, 4, 'F');
+
     doc.setFontSize(11);
-    doc.setTextColor(0, 0, 0);
-    doc.text('CLIENT:', 30, 60);
-    doc.setFontSize(14);
-    doc.text(account?.nom_compte || 'Client Inconnu', 30, 68);
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`Code: ${account?.code_compte || '-'}`, 30, 75);
+    doc.setTextColor(60, 60, 60);
+    doc.text('CLIENT:', 25, clientBoxY + 12);
 
-    // Client Legal Info
-    if (account?.nif) doc.text(`NIF: ${account.nif}`, 30, 80);
-    if (account?.rc) doc.text(`RC: ${account.rc}`, 80, 80);
-    if (account?.nis) doc.text(`NIS: ${account.nis}`, 30, 85);
-    if (account?.ai) doc.text(`AI: ${account.ai}`, 80, 85);
+    doc.setFontSize(16);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'bold');
+    doc.text(account?.nom_compte || 'Client Inconnu', 25, clientBoxY + 22);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(120, 120, 120);
+    doc.text(`Code: ${account?.code_compte || '-'}`, 25, clientBoxY + 32);
+
+    // Client Legal Info inside Box
+    if (account?.nif) doc.text(`NIF: ${account.nif}`, 25, clientBoxY + 38);
+    if (account?.rc) doc.text(`RC: ${account.rc}`, 100, clientBoxY + 38);
+    if (account?.nis) doc.text(`NIS: ${account.nis}`, 25, clientBoxY + 44);
+    if (account?.ai) doc.text(`AI: ${account.ai}`, 100, clientBoxY + 44);
 
     // Vehicle Details Table
-    const startY = 100;
+    const startY = 130;
     doc.line(20, startY, 190, startY); // Top line
     doc.setFontSize(10);
     doc.setTextColor(0);
@@ -248,27 +323,53 @@ export default function LivraisonsPage() {
     doc.setFontSize(10);
     doc.setFont('courier');
     doc.text(op.numero_chassis || '-', 100, startY + 22);
+
     doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text(formatCurrencySafe(op.montant), 190, startY + 22, { align: 'right' });
 
-    // Use PDF-safe formatter
-    doc.text(formatCurrencySafe(op.montant), 160, startY + 22);
+    doc.line(15, startY + 30, 195, startY + 30);
 
-    doc.line(20, startY + 30, 190, startY + 30); // Row bottom
+    // Total Section
+    const totalPaid = _.sumBy(payments.filter(p => p.operation_id === op.id), 'montant');
+    const remaining = Math.max(0, op.montant - totalPaid);
+    const summaryY = startY + 50; // Increased spacing
 
-    // Total
-    doc.setFontSize(14);
-    doc.text('TOTAL NET A PAYER:', 100, 150);
+    doc.setFontSize(11);
+    doc.setTextColor(100, 100, 100);
+    doc.text('Montant Total BL:', 110, summaryY);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'bold');
+    doc.text(formatCurrencySafe(op.montant), 195, summaryY, { align: 'right' });
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 100, 100);
+    doc.text('Déjà Versé:', 110, summaryY + 12);
+    doc.setTextColor(34, 197, 94); // Green-600
+    doc.setFont('helvetica', 'bold');
+    doc.text(formatCurrencySafe(totalPaid), 195, summaryY + 12, { align: 'right' });
+
+    // Net à Payer (Solde)
+    const soldeY = summaryY + 28;
+    doc.setFontSize(13);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'bold');
+    doc.text('SOLDE A REGLER:', 110, soldeY);
+
     doc.setFontSize(16);
-    doc.setTextColor(40, 100, 200); // Blue
-
-    // Use PDF-safe formatter
-    doc.text(formatCurrencySafe(op.montant), 160, 150);
+    if (remaining > 0) {
+      doc.setTextColor(220, 38, 38); // Red-600
+    } else {
+      doc.setTextColor(34, 197, 94); // Green-600
+    }
+    doc.text(formatCurrencySafe(remaining), 195, soldeY, { align: 'right' });
 
     // Footer
     doc.setFontSize(9);
-    doc.setTextColor(150);
-    doc.text('Ce document tient lieu de preuve de livraison.', 20, 270);
-    doc.text(`Genere le ${formatDate(new Date())}`, 20, 275);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(150, 150, 150);
+    doc.text('Ce document tient lieu de preuve de livraison.', 15, 270);
+    doc.text(`Généré le ${formatDate(new Date())}`, 15, 275);
 
     // Save
     doc.save(`BL_${op.marque}_${op.numero_chassis}.pdf`);
@@ -370,7 +471,7 @@ export default function LivraisonsPage() {
   return (
     <div>
       <Navigation />
-      <main className="flex-1 container-modern py-8">
+      <main className="flex-1 max-w-[98%] mx-auto px-4 py-8">
         <PageHeader
           title="Gestion des Livraisons"
           subtitle="Vente de véhicules et suivi des commissions"
@@ -500,6 +601,114 @@ export default function LivraisonsPage() {
           </Card>
         )}
 
+        {showPaymentModal && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <Card title="💸 Enregistrer un Paiement" className="w-full max-w-lg shadow-2xl border-primary-200">
+              <form onSubmit={handlePaymentSubmit} className="space-y-4">
+                <div className="p-3 bg-blue-50 rounded-lg text-sm border border-blue-100 flex justify-between items-center">
+                  <div>
+                    <span className="text-blue-600 block text-xs">Solde à payer</span>
+                    <span className="font-bold text-lg text-blue-900">{formatCurrency(maxPayment)}</span>
+                  </div>
+                  <Button type="button" size="sm" variant="outline" onClick={() => setPaymentFormData({ ...paymentFormData, montant: maxPayment })}>Solder</Button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <Input
+                    label="Date"
+                    type="date"
+                    value={paymentFormData.date_paiement}
+                    onChange={(e) => setPaymentFormData({ ...paymentFormData, date_paiement: e.target.value })}
+                    required
+                  />
+                  <Input
+                    label="Montant (DA)"
+                    type="number"
+                    step="0.01"
+                    max={maxPayment}
+                    value={paymentFormData.montant}
+                    onChange={(e) => setPaymentFormData({ ...paymentFormData, montant: parseFloat(e.target.value) })}
+                    required
+                  />
+                </div>
+
+                <Select
+                  label="Mode de Paiement"
+                  value={paymentFormData.mode_paiement}
+                  onChange={(e) => setPaymentFormData({ ...paymentFormData, mode_paiement: e.target.value })}
+                  options={[
+                    { value: 'virement', label: 'Virement Bancaire' },
+                    { value: 'cheque', label: 'Chèque' },
+                    { value: 'especes', label: 'Espèces' },
+                  ]}
+                  required
+                />
+
+                <Input
+                  label="Référence / Libellé"
+                  value={paymentFormData.reference}
+                  onChange={(e) => setPaymentFormData({ ...paymentFormData, reference: e.target.value })}
+                />
+
+                <div className="flex gap-3 pt-4 border-t">
+                  <Button type="submit" variant="primary" className="flex-1 shadow-lg shadow-primary-200">Enregistrer</Button>
+                  <Button type="button" variant="ghost" onClick={() => setShowPaymentModal(false)}>Annuler</Button>
+                </div>
+              </form>
+            </Card>
+          </div>
+        )}
+
+        {showDetailsModal && selectedDetailsOp && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <Card title={`Détails des paiements : ${selectedDetailsOp.marque} ${selectedDetailsOp.modele}`} subtitle={`VIN: ${selectedDetailsOp.numero_chassis}`} className="w-full max-w-2xl card-modern">
+              <div className="mb-6 bg-slate-50 p-4 rounded-xl flex justify-between items-center border border-slate-200">
+                <div>
+                  <span className="block text-[10px] uppercase font-bold text-slate-500 tracking-wider">Total Vente</span>
+                  <span className="font-bold text-xl text-slate-900">{formatCurrency(selectedDetailsOp.montant)}</span>
+                </div>
+                <div className="text-right">
+                  <span className="block text-[10px] uppercase font-bold text-slate-500 tracking-wider">Reste à payer</span>
+                  <span className={clsx("font-bold text-xl", (selectedDetailsOp.montant - _.sumBy(payments.filter(p => p.operation_id === selectedDetailsOp.id), 'montant')) > 0 ? "text-red-600" : "text-green-600")}>
+                    {formatCurrency(Math.max(0, selectedDetailsOp.montant - _.sumBy(payments.filter(p => p.operation_id === selectedDetailsOp.id), 'montant')))}
+                  </span>
+                </div>
+              </div>
+
+              <div className="max-h-[300px] overflow-y-auto mb-6 border rounded-xl">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 sticky top-0">
+                    <tr className="border-b">
+                      <th className="px-4 py-3 text-left">Date</th>
+                      <th className="px-4 py-3 text-left">Référence</th>
+                      <th className="px-4 py-3 text-left">Mode</th>
+                      <th className="px-4 py-3 text-right">Montant</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {payments.filter(p => p.operation_id === selectedDetailsOp.id).length === 0 ? (
+                      <tr><td colSpan={4} className="px-4 py-12 text-center text-gray-400 italic">Aucun paiement enregistré pour ce bon.</td></tr>
+                    ) : (
+                      payments.filter(p => p.operation_id === selectedDetailsOp.id).map(p => (
+                        <tr key={p.id} className="border-b last:border-0 hover:bg-slate-50/50 transition-colors">
+                          <td className="px-4 py-3">{formatDate(p.date_paiement)}</td>
+                          <td className="px-4 py-3 text-slate-600">{p.reference || '-'}</td>
+                          <td className="px-4 py-3 capitalize text-slate-600">{p.mode_paiement}</td>
+                          <td className="px-4 py-3 text-right font-bold text-green-600">+{formatCurrency(p.montant)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex justify-end">
+                <Button variant="primary" onClick={() => setShowDetailsModal(false)} className="px-8 shadow-lg shadow-primary-100">Fermer</Button>
+              </div>
+            </Card>
+          </div>
+        )}
+
         {/* Livraisons List */}
         <Card title="Historique des Ventes" className="card-modern">
           {/* Toolbar */}
@@ -521,9 +730,9 @@ export default function LivraisonsPage() {
             <div className="text-center py-12"><p className="text-gray-500">Aucune vente trouvée.</p></div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full text-sm">
                 <thead>
-                  <tr>
+                  <tr className="[&_th]:px-2">
                     <th>Date</th>
                     <th>Client</th>
                     <th>Véhicule</th>
@@ -531,13 +740,18 @@ export default function LivraisonsPage() {
                     {isManager && <th className="text-right">Prix Base</th>}
                     {isManager && <th className="text-center bg-green-50">Commission</th>}
                     <th className="text-right">Total Vente</th>
+                    <th className="text-right">Déjà Payé</th>
+                    <th className="text-right">Solde</th>
                     <th className="text-center">Actions</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="[&_td]:px-2">
                   {filteredLivraisons.map((op) => {
                     const account = accounts.find((a) => a.id === op.account_id);
                     const commission = op.commission || ((op.prix_unitaire || 0) - (op.prix_achat || 0));
+                    const opPayments = payments.filter(p => p.operation_id === op.id);
+                    const totalPaid = _.sumBy(opPayments, 'montant');
+                    const remaining = Math.max(0, op.montant - totalPaid);
                     return (
                       <tr key={op.id}>
                         <td className="font-medium">{formatDate(op.date_operation)}</td>
@@ -551,8 +765,18 @@ export default function LivraisonsPage() {
                           </td>
                         )}
                         <td className="text-right font-bold">{formatCurrency(op.montant)}</td>
+                        <td className="text-right text-green-600 font-medium">
+                          {totalPaid > 0 && `+${formatCurrency(totalPaid)}`}
+                        </td>
+                        <td className={clsx("text-right font-bold", remaining > 0 ? "text-red-600" : "text-green-600")}>
+                          {formatCurrency(remaining)}
+                        </td>
                         <td className="text-center">
                           <div className="flex gap-2 justify-center">
+                            <Button size="sm" variant="outline" onClick={() => { setSelectedDetailsOp(op); setShowDetailsModal(true); }} title="Détails des paiements">ℹ️</Button>
+                            {remaining > 0 && (
+                              <Button size="sm" variant="success" onClick={() => handleQuickPayment(op)} title="Enregistrer un paiement">💸</Button>
+                            )}
                             <Button size="sm" variant="outline" onClick={() => generateDeliveryNote(op)} title="Imprimer BL">🖨️</Button>
                             <Button size="sm" variant="outline" onClick={() => handleEdit(op)} title="Modifier">✏️</Button>
                             {isManager && (
